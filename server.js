@@ -1142,5 +1142,5 @@ app.listen(PORT, () => {
   console.log(`📊 API: http://localhost:${PORT}/api/passengers`);
   console.log(`🎫 Fare System: Sri Lankan Stage-based (NTC 2025)`);
   console.log(`📋 Fare Stages API: http://localhost:${PORT}/api/fare/stages`);
-  console.log(`🔗 Python Proxy: Forwarding /api/python/* to http://localhost:8080`);
+  console.log(`🔗 Python Proxy: Forwarding /api/python/* to ${PYTHON_SERVER}`);
 });

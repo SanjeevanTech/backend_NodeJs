@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: bus-tracking-nodejs
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false
+      - key: PYTHON_SERVER_URL
+        value: https://backendpython-production-0ade.up.railway.app
+      - key: PRICE_PER_KM
+        value: 25

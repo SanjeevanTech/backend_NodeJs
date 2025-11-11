@@ -5,10 +5,46 @@
 Your backend-nodejs is ready for deployment with these files:
 - ✅ `server.js` - Main Express server
 - ✅ `package.json` - Dependencies
-- ✅ `railway.json` - Railway configuration
+- ✅ `render.yaml` - Render configuration
+- ✅ `railway.json` - Railway configuration (alternative)
 - ✅ `.env.example` - Environment variables template
 
-## Deploy to Railway
+## Deploy to Render (Recommended)
+
+### Step 1: Push to GitHub
+```bash
+cd backend-nodejs
+git add .
+git commit -m "Ready for Render deployment"
+git push
+```
+
+### Step 2: Deploy on Render
+1. Go to https://render.com
+2. Sign in with GitHub
+3. Click "New +" → "Web Service"
+4. Connect your GitHub repository (backend-nodejs)
+5. Render will automatically detect the `render.yaml` configuration
+
+### Step 3: Configure Environment Variables
+Render will prompt you to set these environment variables:
+- `MONGODB_URI` - Your MongoDB connection string:
+  ```
+  mongodb+srv://sanjeeBusPassenger:Hz3czXqVoc4ThTiO@buspassenger.lskaqo5.mongodb.net/bus_passenger_db?retryWrites=true&w=majority&appName=BusPassenger
+  ```
+- `PYTHON_SERVER_URL` - Your Python backend URL:
+  ```
+  https://backendpython-production-0ade.up.railway.app
+  ```
+- `PRICE_PER_KM` - Price per kilometer (default: 25)
+- `PORT` - Render sets this automatically to 10000
+
+### Step 4: Deploy
+1. Click "Create Web Service"
+2. Render will build and deploy automatically
+3. Get your URL: `https://bus-tracking-nodejs.onrender.com` (or similar)
+
+## Alternative: Deploy to Railway
 
 ### Step 1: Push to GitHub
 ```bash

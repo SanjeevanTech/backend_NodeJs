@@ -37,8 +37,9 @@ git push
    |-----|-------|
    | `MONGODB_URI` | `mongodb+srv://sanjeeBusPassenger:Hz3czXqVoc4ThTiO@buspassenger.lskaqo5.mongodb.net/bus_passenger_db?retryWrites=true&w=majority&appName=BusPassenger` |
    | `PYTHON_SERVER_URL` | `https://backendpython-production-0ade.up.railway.app` |
-   | `PRICE_PER_KM` | `25` |
    | `NODE_ENV` | `production` |
+   
+   **Note:** Price calculation is handled by the Python backend, not Node.js backend.
 
 5. **Deploy**
    - Click "Create Web Service"

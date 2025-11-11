@@ -22,9 +22,10 @@ When deploying to Render, set these environment variables:
 ```
 MONGODB_URI=mongodb+srv://sanjeeBusPassenger:Hz3czXqVoc4ThTiO@buspassenger.lskaqo5.mongodb.net/bus_passenger_db?retryWrites=true&w=majority&appName=BusPassenger
 PYTHON_SERVER_URL=https://backendpython-production-0ade.up.railway.app
-PRICE_PER_KM=25
 NODE_ENV=production
 ```
+
+**Note:** Price/fare calculation is handled by the Python backend using the `fareStages` collection in MongoDB.
 
 ## 🎯 Next Steps
 

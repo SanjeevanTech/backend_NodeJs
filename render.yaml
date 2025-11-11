@@ -13,5 +13,3 @@ services:
         sync: false
       - key: PYTHON_SERVER_URL
         value: https://backendpython-production-0ade.up.railway.app
-      - key: PRICE_PER_KM
-        value: 25

@@ -20,7 +20,6 @@ Copy `.env.example` to `.env` and update:
 MONGODB_URI=your_mongodb_connection_string
 PORT=5000
 PYTHON_SERVER_URL=https://backendpython-production-0ade.up.railway.app
-PRICE_PER_KM=25
 ```
 
 ## Running

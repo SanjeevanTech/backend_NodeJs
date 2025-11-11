@@ -37,10 +37,10 @@ MONGODB_URI=mongodb+srv://sanjeeBusPassenger:Hz3czXqVoc4ThTiO@buspassenger.lskaq
 
 PYTHON_SERVER_URL=https://backendpython-production-0ade.up.railway.app
 
-PRICE_PER_KM=25
-
 NODE_ENV=production
 ```
+
+**Note:** Price calculation is handled by Python backend, not Node.js.
 
 ### Step 5: Deploy ⬜
 - Click "Create Web Service"

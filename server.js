@@ -14,9 +14,10 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   process.env.FRONTEND_URL,
-  // Add your production frontend URLs here after deployment
-  // 'https://your-app.vercel.app',
-  // 'https://your-app.netlify.app'
+  // Vercel deployment URLs
+  'https://frontend-indol-one-90.vercel.app',
+  'https://frontend-git-main-sanjeevan-s-projects.vercel.app',
+  'https://frontend-4j4yi542s-sanjeevan-s-projects.vercel.app',
 ].filter(Boolean);
 
 app.use(cors({

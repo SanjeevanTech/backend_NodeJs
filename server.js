@@ -12,7 +12,6 @@ app.use(compression()); // Compress all responses (70% size reduction)
 // CORS Configuration for Production
 const allowedOrigins = [
   'http://localhost:5173',
-  'http://localhost:3000',
   process.env.FRONTEND_URL,
   // Vercel deployment URLs
   'https://frontend-indol-one-90.vercel.app',

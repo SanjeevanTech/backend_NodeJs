@@ -111,6 +111,10 @@ const Passenger = mongoose.model('Passenger', passengerSchema);
 // Price is calculated by Python server and stored in database
 // No need to recalculate here
 
+// Import auth routes
+const authRoutes = require('./routes/authRoutes');
+app.use('/api/auth', authRoutes);
+
 // Import fare routes
 const fareRoutes = require('./routes/fareRoutes');
 app.use('/api/fare', fareRoutes);

@@ -2,12 +2,14 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const compression = require('compression');
+const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
 const app = express();
 
 // Middleware - OPTIMIZED
 app.use(compression()); // Compress all responses (70% size reduction)
+app.use(cookieParser()); // Parse cookies from requests
 
 // CORS Configuration for Production
 const allowedOrigins = [

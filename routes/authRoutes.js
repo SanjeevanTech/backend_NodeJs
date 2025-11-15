@@ -114,7 +114,8 @@ router.post('/login', async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production', // HTTPS only in production
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Allow cross-site in production
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/' // Ensure cookie is available for all paths
     });
 
     res.json({
@@ -141,7 +142,12 @@ router.post('/login', async (req, res) => {
 // @desc    Logout user
 // @access  Private
 router.post('/logout', verifyToken, (req, res) => {
-  res.clearCookie('authToken');
+  res.clearCookie('authToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/'
+  });
   res.json({
     success: true,
     message: 'Logout successful'

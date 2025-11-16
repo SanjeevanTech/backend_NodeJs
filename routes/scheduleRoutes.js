@@ -16,7 +16,4 @@ router.get('/:bus_id', getBusSchedule);
 // @route   POST /api/bus-schedule
 router.post('/', saveBusSchedule);
 
-// @route   GET /api/scheduled-trips
-router.get('/scheduled/trips', getScheduledTrips);
-
 module.exports = router;

@@ -77,7 +77,10 @@ app.use('/api/unmatched', unmatchedRoutes);
 // Schedule Routes (Protected)
 const scheduleRoutes = require('./routes/scheduleRoutes');
 app.use('/api/bus-schedule', scheduleRoutes);
-app.use('/api/scheduled-trips', scheduleRoutes);
+
+// Scheduled Trips Routes (Protected) - Separate router
+const scheduledTripsRoutes = require('./routes/scheduledTripsRoutes');
+app.use('/api/scheduled-trips', scheduledTripsRoutes);
 
 // Route Routes (Protected)
 const routeRoutes = require('./routes/routeRoutes');
@@ -87,6 +90,10 @@ app.use('/api/routes', routeRoutes);
 // Config Routes (Protected)
 const configRoutes = require('./routes/configRoutes');
 app.use('/api/config', configRoutes);
+
+// Power Config Routes (Protected)
+const powerConfigRoutes = require('./routes/powerConfigRoutes');
+app.use('/api/power-config', powerConfigRoutes);
 
 // Fare Routes (Protected)
 const fareRoutes = require('./routes/fareRoutes');

@@ -37,16 +37,15 @@ const updatePriceConfig = async (req, res) => {
   }
 };
 
-// @desc    Sync power config with schedule
-// @route   POST /api/sync-power-config
+// @desc    Sync power config with schedule (Deprecated - use /api/power-config instead)
+// @route   POST /api/config/sync-power
 // @access  Private
 const syncPowerConfig = async (req, res) => {
   try {
-    const BusSchedule = getModel('BusSchedule', 'bus_schedules');
-    // Add sync logic here
     res.json({
       status: 'success',
-      message: 'Power config synced'
+      message: 'This endpoint is deprecated. Use /api/power-config for power management.',
+      redirect: '/api/power-config'
     });
   } catch (error) {
     res.status(500).json({

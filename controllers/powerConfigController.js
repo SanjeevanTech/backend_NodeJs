@@ -22,6 +22,12 @@ const PowerConfig = mongoose.model('PowerConfig',
   'powerConfigs'
 );
 
+// Bus Schedule Model (flexible schema for busSchedules collection)
+const BusSchedule = mongoose.models.BusSchedule || mongoose.model('BusSchedule', 
+  new mongoose.Schema({}, { strict: false }), 
+  'busSchedules'
+);
+
 // @desc    Get all power configs
 // @route   GET /api/power-config
 // @access  Private
@@ -236,11 +242,102 @@ const getPowerConfigStats = async (req, res) => {
   }
 };
 
+// @desc    Sync power config with schedule
+// @route   POST /api/power-config/sync
+// @access  Private
+const syncPowerConfig = async (req, res) => {
+  try {
+    const { bus_id } = req.body;
+    
+    if (!bus_id) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'bus_id is required'
+      });
+    }
+    
+    const schedule = await BusSchedule.findOne({ bus_id });
+    
+    // If no schedule or no trips, set default times (full day operation)
+    if (!schedule || !schedule.trips || schedule.trips.length === 0) {
+      const configData = {
+        bus_id,
+        trip_start: '00:00',
+        trip_end: '23:59',
+        updated_at: new Date()
+      };
+      
+      await PowerConfig.updateOne(
+        { bus_id },
+        { $set: configData },
+        { upsert: true }
+      );
+      
+      return res.json({
+        status: 'success',
+        message: 'No trips found - power config set to full day operation',
+        trip_start: '00:00',
+        trip_end: '23:59',
+        bus_id
+      });
+    }
+    
+    // Calculate earliest start and latest end from all trips
+    let earliestStart = '23:59';
+    let latestEnd = '00:00';
+    
+    schedule.trips.forEach(trip => {
+      // Use boarding_start_time or departure_time as start
+      const startTime = trip.boarding_start_time || trip.departure_time || trip.start_time;
+      // Use estimated_arrival_time or end_time as end
+      const endTime = trip.estimated_arrival_time || trip.end_time;
+      
+      if (startTime && startTime < earliestStart) {
+        earliestStart = startTime;
+      }
+      if (endTime && endTime > latestEnd) {
+        latestEnd = endTime;
+      }
+    });
+    
+    // Update or create power config with calculated times
+    const configData = {
+      bus_id,
+      bus_name: schedule.bus_name || bus_id,
+      trip_start: earliestStart,
+      trip_end: latestEnd,
+      updated_at: new Date()
+    };
+    
+    await PowerConfig.updateOne(
+      { bus_id },
+      { $set: configData },
+      { upsert: true }
+    );
+    
+    res.json({
+      status: 'success',
+      message: 'Power config synced with schedule',
+      trip_start: earliestStart,
+      trip_end: latestEnd,
+      bus_id
+    });
+  } catch (error) {
+    console.error('Error syncing power config:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to sync power config',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllPowerConfigs,
   getPowerConfig,
   savePowerConfig,
   deletePowerConfig,
   toggleSmartPower,
-  getPowerConfigStats
+  getPowerConfigStats,
+  syncPowerConfig
 };

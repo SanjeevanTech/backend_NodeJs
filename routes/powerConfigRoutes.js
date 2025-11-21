@@ -7,7 +7,8 @@ const {
   savePowerConfig,
   deletePowerConfig,
   toggleSmartPower,
-  getPowerConfigStats
+  getPowerConfigStats,
+  syncPowerConfig
 } = require('../controllers/powerConfigController');
 
 // All routes are protected
@@ -33,5 +34,8 @@ router.patch('/:bus_id/toggle-smart', toggleSmartPower);
 
 // @route   DELETE /api/power-config/:bus_id
 router.delete('/:bus_id', deletePowerConfig);
+
+// @route   POST /api/power-config/sync
+router.post('/sync', syncPowerConfig);
 
 module.exports = router;

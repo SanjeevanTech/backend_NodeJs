@@ -148,42 +148,20 @@ const updateWaypointGroup = async (req, res) => {
 // @access  Private
 const deleteWaypointGroup = async (req, res) => {
   try {
-    const { permanent } = req.query;
+    // Hard delete - permanently remove from database
+    const group = await WaypointGroup.findOneAndDelete({ group_id: req.params.group_id });
     
-    if (permanent === 'true') {
-      const group = await WaypointGroup.findOneAndDelete({ group_id: req.params.group_id });
-      
-      if (!group) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Waypoint group not found'
-        });
-      }
-      
-      res.json({
-        status: 'success',
-        message: 'Waypoint group permanently deleted'
-      });
-    } else {
-      const group = await WaypointGroup.findOneAndUpdate(
-        { group_id: req.params.group_id },
-        { $set: { is_active: false, updated_at: new Date() } },
-        { new: true }
-      );
-      
-      if (!group) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Waypoint group not found'
-        });
-      }
-      
-      res.json({
-        status: 'success',
-        message: 'Waypoint group deactivated',
-        group: group
+    if (!group) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Waypoint group not found'
       });
     }
+    
+    res.json({
+      status: 'success',
+      message: 'Waypoint group deleted permanently'
+    });
   } catch (error) {
     console.error('Error deleting waypoint group:', error);
     res.status(500).json({

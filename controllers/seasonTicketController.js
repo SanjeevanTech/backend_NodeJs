@@ -172,44 +172,22 @@ const updateMember = async (req, res) => {
 // @access  Private
 const deleteMember = async (req, res) => {
   try {
-    const { permanent } = req.query;
+    // Hard delete - permanently remove from database
+    const member = await SeasonTicketMember.findOneAndDelete({ 
+      member_id: req.params.member_id 
+    });
     
-    if (permanent === 'true') {
-      const member = await SeasonTicketMember.findOneAndDelete({ 
-        member_id: req.params.member_id 
-      });
-      
-      if (!member) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Member not found'
-        });
-      }
-      
-      res.json({
-        status: 'success',
-        message: 'Member permanently deleted'
-      });
-    } else {
-      const member = await SeasonTicketMember.findOneAndUpdate(
-        { member_id: req.params.member_id },
-        { $set: { is_active: false, updated_at: new Date() } },
-        { new: true }
-      );
-      
-      if (!member) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Member not found'
-        });
-      }
-      
-      res.json({
-        status: 'success',
-        message: 'Member deactivated',
-        member: member
+    if (!member) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Member not found'
       });
     }
+    
+    res.json({
+      status: 'success',
+      message: 'Member deleted permanently'
+    });
   } catch (error) {
     console.error('Error deleting member:', error);
     res.status(500).json({

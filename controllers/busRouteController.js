@@ -227,42 +227,20 @@ const updateBusRoute = async (req, res) => {
 // @access  Private
 const deleteBusRoute = async (req, res) => {
   try {
-    const { permanent } = req.query;
+    // Hard delete - permanently remove from database
+    const route = await BusRoute.findOneAndDelete({ route_id: req.params.route_id });
     
-    if (permanent === 'true') {
-      const route = await BusRoute.findOneAndDelete({ route_id: req.params.route_id });
-      
-      if (!route) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Route not found'
-        });
-      }
-      
-      res.json({
-        status: 'success',
-        message: 'Route permanently deleted'
-      });
-    } else {
-      const route = await BusRoute.findOneAndUpdate(
-        { route_id: req.params.route_id },
-        { $set: { is_active: false, updated_at: new Date() } },
-        { new: true }
-      );
-      
-      if (!route) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Route not found'
-        });
-      }
-      
-      res.json({
-        status: 'success',
-        message: 'Route deactivated',
-        route: route
+    if (!route) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Route not found'
       });
     }
+    
+    res.json({
+      status: 'success',
+      message: 'Route deleted permanently'
+    });
   } catch (error) {
     console.error('Error deleting route:', error);
     res.status(500).json({

@@ -29,11 +29,19 @@ const getUnmatched = async (req, res) => {
         
         if (schedule && schedule.trips && schedule.trips[tripIndex]) {
           const scheduledTrip = schedule.trips[tripIndex];
-          const departureTime = scheduledTrip.departure_time;
-          const [depHour] = departureTime.split(':').map(Number);
+          const departureTime = scheduledTrip.departure_time || scheduledTrip.boarding_start_time;
+          const [depHour, depMin] = departureTime.split(':').map(Number);
           
-          const startWindow = new Date(`${dateFromTrip}T${String(Math.max(0, depHour - 2)).padStart(2, '0')}:00:00Z`);
-          const endWindow = new Date(`${dateFromTrip}T${String(Math.min(23, depHour + 2)).padStart(2, '0')}:59:59Z`);
+          console.log(`🎯 Filtering unmatched for scheduled trip: ${trip_id}`);
+          console.log(`   Departure time: ${departureTime}`);
+          console.log(`   Date: ${dateFromTrip}`);
+          
+          // Create time window: ±30 minutes around departure time (more precise filtering)
+          const departureDate = new Date(`${dateFromTrip}T${departureTime}:00`);
+          const startWindow = new Date(departureDate.getTime() - 30 * 60 * 1000); // 30 min before
+          const endWindow = new Date(departureDate.getTime() + 30 * 60 * 1000);   // 30 min after
+          
+          console.log(`   Time window: ${startWindow.toISOString()} to ${endWindow.toISOString()}`);
           
           query.bus_id = busIdFromTrip;
           query.timestamp = {

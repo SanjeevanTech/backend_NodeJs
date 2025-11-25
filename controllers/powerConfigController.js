@@ -22,11 +22,8 @@ const PowerConfig = mongoose.model('PowerConfig',
   'powerConfigs'
 );
 
-// Bus Schedule Model (flexible schema for busSchedules collection)
-const BusSchedule = mongoose.models.BusSchedule || mongoose.model('BusSchedule', 
-  new mongoose.Schema({}, { strict: false }), 
-  'busSchedules'
-);
+// Bus Schedule Model - Import the proper model
+const BusSchedule = require('../models/BusSchedule');
 
 // @desc    Get all power configs
 // @route   GET /api/power-config
@@ -257,6 +254,14 @@ const syncPowerConfig = async (req, res) => {
     }
     
     const schedule = await BusSchedule.findOne({ bus_id });
+    console.log('Syncing power config for bus:', bus_id);
+    console.log('Found schedule:', schedule ? 'Yes' : 'No');
+    if (schedule) {
+      console.log('Schedule trips count:', schedule.trips ? schedule.trips.length : 0);
+      if (schedule.trips && schedule.trips.length > 0) {
+        console.log('First trip:', JSON.stringify(schedule.trips[0], null, 2));
+      }
+    }
     
     // If no schedule or no trips, set default times (full day operation)
     if (!schedule || !schedule.trips || schedule.trips.length === 0) {
@@ -282,9 +287,9 @@ const syncPowerConfig = async (req, res) => {
       });
     }
     
-    // Calculate earliest start and latest end from all trips
-    let earliestStart = '23:59';
-    let latestEnd = '00:00';
+    let earliestStart = null;
+    let latestEnd = null;
+    const tripWindows = [];
     
     schedule.trips.forEach(trip => {
       // Use boarding_start_time or departure_time as start
@@ -292,20 +297,43 @@ const syncPowerConfig = async (req, res) => {
       // Use estimated_arrival_time or end_time as end
       const endTime = trip.estimated_arrival_time || trip.end_time;
       
-      if (startTime && startTime < earliestStart) {
-        earliestStart = startTime;
+      if (startTime) {
+        if (earliestStart === null || startTime < earliestStart) {
+          earliestStart = startTime;
+        }
       }
-      if (endTime && endTime > latestEnd) {
-        latestEnd = endTime;
+      
+      if (endTime) {
+        if (latestEnd === null || endTime > latestEnd) {
+          latestEnd = endTime;
+        }
+      }
+      
+      // Create trip window for each trip
+      if (startTime && endTime) {
+        tripWindows.push({
+          start_time: startTime,
+          end_time: endTime,
+          route: trip.trip_name || trip.direction || schedule.route_name || 'Unknown Route',
+          active: trip.active !== undefined ? trip.active : true
+        });
       }
     });
     
-    // Update or create power config with calculated times
+    // Fallback to default times if no valid times found
+    if (earliestStart === null) earliestStart = '00:00';
+    if (latestEnd === null) latestEnd = '23:59';
+    
+    console.log('Calculated times - Start:', earliestStart, 'End:', latestEnd);
+    console.log('Trip windows created:', tripWindows.length);
+    
+    // Update or create power config with calculated times and trip windows
     const configData = {
       bus_id,
       bus_name: schedule.bus_name || bus_id,
       trip_start: earliestStart,
       trip_end: latestEnd,
+      trip_windows: tripWindows,
       updated_at: new Date()
     };
     

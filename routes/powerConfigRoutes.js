@@ -26,6 +26,10 @@ router.get('/:bus_id', getPowerConfig);
 // @route   POST /api/power-config (Create or Update - upsert)
 router.post('/', savePowerConfig);
 
+// @route   PUT /api/power-config/sync (Update power config based on schedule)
+// IMPORTANT: This must come BEFORE /:bus_id route to avoid matching "sync" as a bus_id
+router.put('/sync', syncPowerConfig);
+
 // @route   PUT /api/power-config/:bus_id (Update existing)
 router.put('/:bus_id', savePowerConfig);
 
@@ -37,8 +41,5 @@ router.patch('/:bus_id/toggle-smart', toggleSmartPower);
 
 // @route   DELETE /api/power-config/:bus_id
 router.delete('/:bus_id', deletePowerConfig);
-
-// @route   PUT /api/power-config/sync (Update power config based on schedule)
-router.put('/sync', syncPowerConfig);
 
 module.exports = router;

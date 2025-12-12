@@ -1,21 +1,25 @@
 const Passenger = require('../models/Passenger');
 const BusSchedule = require('../models/BusSchedule');
 
+console.log("🚀 Passenger Controller Loaded - Timezone Fix Applied");
+
 // @desc    Get all passengers with filters and pagination
 // @route   GET /api/passengers
 // @access  Private
 const getPassengers = async (req, res) => {
   try {
-    const { 
-      limit = 50, 
-      skip = 0, 
-      trip_id, 
-      bus_id, 
-      date 
+    const {
+      limit = 50,
+      skip = 0,
+      trip_id,
+      bus_id,
+      date
     } = req.query;
-    
+
+    console.log(`📥 API Call: getPassengers | Trip: ${trip_id} | Bus: ${bus_id} | Date: ${date}`);
+
     const query = {};
-    
+
     // Handle scheduled trip filtering
     if (trip_id && trip_id !== 'ALL') {
       if (trip_id.startsWith('SCHEDULED_')) {
@@ -23,25 +27,29 @@ const getPassengers = async (req, res) => {
         const tripIndex = parseInt(parts[parts.length - 1]);
         const busIdFromTrip = parts.slice(1, -2).join('_');
         const dateFromTrip = parts[parts.length - 2];
-        
+
         const schedule = await BusSchedule.findOne({ bus_id: busIdFromTrip });
-        
+
         if (schedule && schedule.trips && schedule.trips[tripIndex]) {
           const scheduledTrip = schedule.trips[tripIndex];
           const departureTime = scheduledTrip.departure_time || scheduledTrip.boarding_start_time;
-          const [depHour, depMin] = departureTime.split(':').map(Number);
-          
-          console.log(`🎯 Filtering for scheduled trip: ${trip_id}`);
-          console.log(`   Departure time: ${departureTime}`);
-          console.log(`   Date: ${dateFromTrip}`);
-          
-          // Create time window: ±30 minutes around departure time (more precise filtering)
-          const departureDate = new Date(`${dateFromTrip}T${departureTime}:00`);
-          const startWindow = new Date(departureDate.getTime() - 30 * 60 * 1000); // 30 min before
-          const endWindow = new Date(departureDate.getTime() + 30 * 60 * 1000);   // 30 min after
-          
-          console.log(`   Time window: ${startWindow.toISOString()} to ${endWindow.toISOString()}`);
-          
+
+          console.log(`🎯 Filtering for scheduled trip ID: ${trip_id}`);
+          console.log(`   Found Trip Name: ${scheduledTrip.trip_name}`);
+          console.log(`   Departure time (Sched): ${departureTime}`);
+          console.log(`   Date (Sched): ${dateFromTrip}`);
+
+          // FIX: Treat departure time as Local Time (+05:30 for Sri Lanka) to get correct UTC window
+          // Previous implementation treated departure hour as UTC, which shifted window by ~5.5 hours
+          const tripDateTimeStr = `${dateFromTrip}T${departureTime}:00.000+05:30`;
+          const tripDate = new Date(tripDateTimeStr);
+
+          // Create window ±3 hours around the scheduled time
+          const startWindow = new Date(tripDate.getTime() - 3 * 60 * 60 * 1000);
+          const endWindow = new Date(tripDate.getTime() + 3 * 60 * 60 * 1000);
+
+          console.log(`   Time window (±3 hours): ${startWindow.toISOString()} to ${endWindow.toISOString()}`);
+
           query.bus_id = busIdFromTrip;
           query.entry_timestamp = {
             $gte: startWindow,
@@ -52,9 +60,9 @@ const getPassengers = async (req, res) => {
         query.trip_id = trip_id;
       }
     }
-    
+
     if (bus_id && bus_id !== 'ALL' && !query.bus_id) query.bus_id = bus_id;
-    
+
     if (date && !query.entry_timestamp) {
       const dateStr = date.substring(0, 10);
       query.entry_timestamp = {
@@ -62,7 +70,7 @@ const getPassengers = async (req, res) => {
         $lte: new Date(dateStr + 'T23:59:59.999Z')
       };
     }
-    
+
     const [passengers, total] = await Promise.all([
       Passenger.find(query)
         .select('-__v')
@@ -97,7 +105,7 @@ const getPassengers = async (req, res) => {
 const getPassengersByDateRange = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    
+
     const query = {};
     if (startDate && endDate) {
       query.entry_timestamp = {
@@ -131,14 +139,14 @@ const getPassengersByDateRange = async (req, res) => {
 const getStats = async (req, res) => {
   try {
     const { date } = req.query;
-    
+
     let query = {};
     if (date) {
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
-      
+
       query.entry_timestamp = {
         $gte: startOfDay,
         $lte: endOfDay
@@ -146,13 +154,13 @@ const getStats = async (req, res) => {
     }
 
     const passengers = await Passenger.find(query).lean();
-    
+
     const totalPassengers = passengers.length;
-    const totalDistance = passengers.reduce((sum, p) => 
+    const totalDistance = passengers.reduce((sum, p) =>
       sum + (p.distance_info?.distance_km || 0), 0
     );
-    
-    const totalRevenue = passengers.reduce((sum, p) => 
+
+    const totalRevenue = passengers.reduce((sum, p) =>
       sum + (p.price || 0), 0
     );
 

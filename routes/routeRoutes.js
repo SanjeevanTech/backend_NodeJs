@@ -12,7 +12,7 @@ const {
 router.use(verifyToken);
 
 // @route   GET /api/route-distance
-router.get('/distance', calculateRouteDistance);
+router.get('/', calculateRouteDistance);
 
 // @route   POST /api/routes
 router.post('/', createRoute);

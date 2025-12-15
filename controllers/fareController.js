@@ -7,7 +7,7 @@ const getFareStages = async (req, res) => {
   try {
     const stages = await FareStage.find({ is_active: true })
       .sort({ stage_number: 1 });
-    
+
     res.json({
       status: 'success',
       total: stages.length,
@@ -28,17 +28,17 @@ const getFareStages = async (req, res) => {
 const calculateFare = async (req, res) => {
   try {
     const { distance } = req.query;
-    
+
     if (!distance) {
       return res.status(400).json({
         status: 'error',
         message: 'Distance parameter required'
       });
     }
-    
+
     const fare = await FareStage.calculateFare(parseFloat(distance));
-    const stageNumber = Math.ceil(parseFloat(distance) / 3.5);
-    
+    const stageNumber = Math.ceil(parseFloat(distance) / 2.0);
+
     res.json({
       status: 'success',
       distance_km: parseFloat(distance),
@@ -60,20 +60,20 @@ const calculateFare = async (req, res) => {
 const bulkImportFareStages = async (req, res) => {
   try {
     const { stages } = req.body;
-    
+
     if (!stages || !Array.isArray(stages)) {
       return res.status(400).json({
         status: 'error',
         message: 'Stages array required'
       });
     }
-    
+
     // Clear existing stages
     await FareStage.deleteMany({});
-    
+
     // Insert new stages
     const result = await FareStage.insertMany(stages);
-    
+
     res.json({
       status: 'success',
       message: `Imported ${result.length} fare stages`,
@@ -95,24 +95,24 @@ const updateFareStage = async (req, res) => {
   try {
     const { stageNumber } = req.params;
     const { fare } = req.body;
-    
+
     const updated = await FareStage.findOneAndUpdate(
       { stage_number: parseInt(stageNumber) },
-      { 
+      {
         fare: fare,
         updated_at: new Date(),
         updated_by: req.body.updated_by || 'admin'
       },
       { new: true }
     );
-    
+
     if (!updated) {
       return res.status(404).json({
         status: 'error',
         message: 'Stage not found'
       });
     }
-    
+
     res.json({
       status: 'success',
       message: 'Fare stage updated',

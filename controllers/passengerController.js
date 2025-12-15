@@ -1,7 +1,8 @@
 const Passenger = require('../models/Passenger');
 const BusSchedule = require('../models/BusSchedule');
+const ScheduleHistory = require('../models/ScheduleHistory');
 
-console.log("🚀 Passenger Controller Loaded - Timezone Fix Applied");
+console.log("🚀 Passenger Controller Loaded - Schedule History Support Added");
 
 // @desc    Get all passengers with filters and pagination
 // @route   GET /api/passengers
@@ -28,33 +29,133 @@ const getPassengers = async (req, res) => {
         const busIdFromTrip = parts.slice(1, -2).join('_');
         const dateFromTrip = parts[parts.length - 2];
 
-        const schedule = await BusSchedule.findOne({ bus_id: busIdFromTrip });
+        // Check if this is a historical date
+        const tripDate = new Date(dateFromTrip);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        tripDate.setHours(0, 0, 0, 0);
+        const isHistoricalDate = tripDate < today;
 
-        if (schedule && schedule.trips && schedule.trips[tripIndex]) {
-          const scheduledTrip = schedule.trips[tripIndex];
-          const departureTime = scheduledTrip.departure_time || scheduledTrip.boarding_start_time;
+        if (isHistoricalDate) {
+          console.log(`🎯 Filtering for historical scheduled trip ID: ${trip_id}`);
+          console.log(`   Date from trip ID: ${dateFromTrip}, Trip index: ${tripIndex}`);
 
-          console.log(`🎯 Filtering for scheduled trip ID: ${trip_id}`);
-          console.log(`   Found Trip Name: ${scheduledTrip.trip_name}`);
-          console.log(`   Departure time (Sched): ${departureTime}`);
-          console.log(`   Date (Sched): ${dateFromTrip}`);
+          // First, check if we have schedule history for this date
+          const scheduleHistory = await ScheduleHistory.findOne({
+            bus_id: busIdFromTrip,
+            date: dateFromTrip
+          });
 
-          // FIX: Treat departure time as Local Time (+05:30 for Sri Lanka) to get correct UTC window
-          // Previous implementation treated departure hour as UTC, which shifted window by ~5.5 hours
-          const tripDateTimeStr = `${dateFromTrip}T${departureTime}:00.000+05:30`;
-          const tripDate = new Date(tripDateTimeStr);
+          if (scheduleHistory && scheduleHistory.trips && scheduleHistory.trips[tripIndex]) {
+            // Use the saved schedule history
+            console.log(`   ✅ Using saved schedule history for ${dateFromTrip}`);
+            const scheduledTrip = scheduleHistory.trips[tripIndex];
+            const departureTime = scheduledTrip.departure_time || scheduledTrip.boarding_start_time;
+            const arrivalTime = scheduledTrip.estimated_arrival_time;
 
-          // Create window ±3 hours around the scheduled time
-          const startWindow = new Date(tripDate.getTime() - 3 * 60 * 60 * 1000);
-          const endWindow = new Date(tripDate.getTime() + 3 * 60 * 60 * 1000);
+            console.log(`   Trip: ${scheduledTrip.trip_name}`);
+            console.log(`   Departure: ${departureTime}, Arrival: ${arrivalTime}`);
 
-          console.log(`   Time window (±3 hours): ${startWindow.toISOString()} to ${endWindow.toISOString()}`);
+            // Create time window using the historical schedule
+            const tripDateTimeStr = `${dateFromTrip}T${departureTime}:00.000+05:30`;
+            const tripDateTime = new Date(tripDateTimeStr);
 
-          query.bus_id = busIdFromTrip;
-          query.entry_timestamp = {
-            $gte: startWindow,
-            $lte: endWindow
-          };
+            // Create window ±3 hours around the scheduled time
+            const startWindow = new Date(tripDateTime.getTime() - 3 * 60 * 60 * 1000);
+            const endWindow = new Date(tripDateTime.getTime() + 3 * 60 * 60 * 1000);
+
+            console.log(`   Time window (±3 hours): ${startWindow.toISOString()} to ${endWindow.toISOString()}`);
+
+            query.bus_id = busIdFromTrip;
+            query.entry_timestamp = {
+              $gte: startWindow,
+              $lte: endWindow
+            };
+          } else {
+            // No schedule history, fall back to deriving from passenger data
+            console.log(`   ⚠️ No schedule history - deriving from passenger data`);
+
+            // Query passengers for this date and bus, grouped by time windows
+            const dayPassengers = await Passenger.find({
+              bus_id: busIdFromTrip,
+              entry_timestamp: {
+                $gte: new Date(dateFromTrip + 'T00:00:00.000Z'),
+                $lte: new Date(dateFromTrip + 'T23:59:59.999Z')
+              }
+            }).sort({ entry_timestamp: 1 }).lean();
+
+            // Group passengers into trips based on 4-hour windows (same logic as getTrips)
+            const tripWindows = {};
+            for (const p of dayPassengers) {
+              const entryHour = new Date(p.entry_timestamp).getUTCHours();
+              const windowKey = Math.floor(entryHour / 4);
+              if (!tripWindows[windowKey]) {
+                tripWindows[windowKey] = [];
+              }
+              tripWindows[windowKey].push(p);
+            }
+
+            // Sort windows and get the correct trip
+            const sortedWindows = Object.keys(tripWindows).sort((a, b) => parseInt(a) - parseInt(b));
+
+            if (tripIndex < sortedWindows.length) {
+              const targetWindow = sortedWindows[tripIndex];
+              const targetPassengers = tripWindows[targetWindow];
+
+              // Get time bounds for this window
+              const firstEntry = new Date(targetPassengers[0].entry_timestamp);
+              const lastEntry = new Date(targetPassengers[targetPassengers.length - 1].entry_timestamp);
+
+              // Create a window ±30 minutes around the actual data bounds
+              const startWindow = new Date(firstEntry.getTime() - 30 * 60 * 1000);
+              const endWindow = new Date(lastEntry.getTime() + 30 * 60 * 1000);
+
+              console.log(`   Historical trip window: ${startWindow.toISOString()} to ${endWindow.toISOString()}`);
+
+              query.bus_id = busIdFromTrip;
+              query.entry_timestamp = {
+                $gte: startWindow,
+                $lte: endWindow
+              };
+            } else {
+              console.log(`   Trip index ${tripIndex} not found in historical data`);
+              // Return empty results if trip index doesn't exist
+              query.bus_id = busIdFromTrip;
+              query.entry_timestamp = {
+                $gte: new Date(dateFromTrip + 'T00:00:00.000Z'),
+                $lte: new Date(dateFromTrip + 'T00:00:00.001Z') // Basically no results
+              };
+            }
+          }
+        } else {
+          // For current/future dates, use the schedule
+          const schedule = await BusSchedule.findOne({ bus_id: busIdFromTrip });
+
+          if (schedule && schedule.trips && schedule.trips[tripIndex]) {
+            const scheduledTrip = schedule.trips[tripIndex];
+            const departureTime = scheduledTrip.departure_time || scheduledTrip.boarding_start_time;
+
+            console.log(`🎯 Filtering for scheduled trip ID: ${trip_id}`);
+            console.log(`   Found Trip Name: ${scheduledTrip.trip_name}`);
+            console.log(`   Departure time (Sched): ${departureTime}`);
+            console.log(`   Date (Sched): ${dateFromTrip}`);
+
+            // FIX: Treat departure time as Local Time (+05:30 for Sri Lanka) to get correct UTC window
+            const tripDateTimeStr = `${dateFromTrip}T${departureTime}:00.000+05:30`;
+            const tripDateTime = new Date(tripDateTimeStr);
+
+            // Create window ±3 hours around the scheduled time
+            const startWindow = new Date(tripDateTime.getTime() - 3 * 60 * 60 * 1000);
+            const endWindow = new Date(tripDateTime.getTime() + 3 * 60 * 60 * 1000);
+
+            console.log(`   Time window (±3 hours): ${startWindow.toISOString()} to ${endWindow.toISOString()}`);
+
+            query.bus_id = busIdFromTrip;
+            query.entry_timestamp = {
+              $gte: startWindow,
+              $lte: endWindow
+            };
+          }
         }
       } else {
         query.trip_id = trip_id;

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const createAdmin = async () => {
   try {
@@ -10,7 +11,7 @@ const createAdmin = async () => {
 
     // Check if admin already exists
     const existingAdmin = await User.findOne({ email: 'admin@gmail.com' });
-    
+
     if (existingAdmin) {
       console.log('⚠️  Admin user already exists!');
       console.log('Email:', existingAdmin.email);

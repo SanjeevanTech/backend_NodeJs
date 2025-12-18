@@ -28,59 +28,11 @@ const getBusSchedule = async (req, res) => {
 // @access  Private
 const saveBusSchedule = async (req, res) => {
   try {
+    // Use the schedule data from the request directly
     const scheduleData = {
       ...req.body,
       updated_at: new Date()
     };
-
-    // LOGIC TO PREVENT EDITING START TIMES FOR ACTIVE/PAST TRIPS
-    // Fetch the existing schedule
-    const existingSchedule = await BusSchedule.findOne({ bus_id: req.body.bus_id });
-
-    if (existingSchedule && existingSchedule.trips && Array.isArray(existingSchedule.trips)) {
-      const now = new Date();
-      const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
-
-      // We assume the user is updating the full list. 
-      // Iterate through the NEW trips and check if they match an OLD trip that has started.
-      // If so, restore the OLD start times.
-      if (req.body.trips && Array.isArray(req.body.trips)) {
-        req.body.trips = req.body.trips.map((newTrip, index) => {
-          // Try to find matching old trip by ID if available, otherwise by index.
-          let oldTrip = null;
-          if (newTrip._id) {
-            oldTrip = existingSchedule.trips.find(t => t._id && t._id.toString() === newTrip._id);
-          }
-
-          // Fallback to index if no ID matched (or new trip doesn't have ID yet)
-          // Assuming that the trip at index I corresponds to the same trip if user didn't reorder.
-          if (!oldTrip && index < existingSchedule.trips.length) {
-            oldTrip = existingSchedule.trips[index];
-          }
-
-          if (oldTrip && oldTrip.boarding_start_time) {
-            // Parse old start time
-            const [oldH, oldM] = oldTrip.boarding_start_time.split(':').map(Number);
-            const oldStartMinutes = oldH * 60 + oldM;
-
-            // If the trip has already started (or passed), we LOCK the start times.
-            if (currentTotalMinutes >= oldStartMinutes) {
-              console.log(`🔒 Trip ${index} (${newTrip.trip_name || 'Unknown'}) has started/passed. Locking start times.`);
-
-              // Overwrite new start times with old ones to prevent editing
-              newTrip.boarding_start_time = oldTrip.boarding_start_time;
-              newTrip.departure_time = oldTrip.departure_time || oldTrip.boarding_start_time;
-
-              // We do NOT overwrite 'estimated_arrival_time', so the user CAN update that.
-            }
-          }
-          return newTrip;
-        });
-
-        // Update the scheduleData with the processed trips
-        scheduleData.trips = req.body.trips;
-      }
-    }
 
     // Save to main schedule collection (for current/future use)
     const result = await BusSchedule.updateOne(

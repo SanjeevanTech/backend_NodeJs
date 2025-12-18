@@ -6,11 +6,15 @@ const {
   getWaypointGroupById,
   createWaypointGroup,
   updateWaypointGroup,
-  deleteWaypointGroup
+  deleteWaypointGroup,
+  getUniqueWaypoints
 } = require('../controllers/waypointGroupController');
 
 // All routes are protected
 router.use(verifyToken);
+
+// @route   GET /api/waypoint-groups/waypoints/unique
+router.get('/waypoints/unique', getUniqueWaypoints);
 
 // @route   GET /api/waypoint-groups
 router.get('/', getWaypointGroups);

@@ -6,13 +6,13 @@ const WaypointGroup = require('../models/WaypointGroup');
 const getWaypointGroups = async (req, res) => {
   try {
     const { region, active_only } = req.query;
-    
+
     let query = {};
     if (region) query.region = region;
     if (active_only === 'true') query.is_active = true;
-    
+
     const groups = await WaypointGroup.find(query).sort({ group_name: 1 });
-    
+
     res.json({
       status: 'success',
       total: groups.length,
@@ -34,14 +34,14 @@ const getWaypointGroups = async (req, res) => {
 const getWaypointGroupById = async (req, res) => {
   try {
     const group = await WaypointGroup.findOne({ group_id: req.params.group_id });
-    
+
     if (!group) {
       return res.status(404).json({
         status: 'error',
         message: 'Waypoint group not found'
       });
     }
-    
+
     res.json({
       status: 'success',
       group: group
@@ -62,20 +62,20 @@ const getWaypointGroupById = async (req, res) => {
 const createWaypointGroup = async (req, res) => {
   try {
     const { group_name, region, waypoints } = req.body;
-    
+
     if (!group_name || !waypoints || waypoints.length < 2) {
       return res.status(400).json({
         status: 'error',
         message: 'Group name and at least 2 waypoints are required'
       });
     }
-    
+
     // Auto-generate group_id
     const count = await WaypointGroup.countDocuments();
     const group_id = `WPG_${String(count + 1).padStart(3, '0')}`;
-    
+
     const sortedWaypoints = waypoints.sort((a, b) => a.order - b.order);
-    
+
     const group = new WaypointGroup({
       group_id,
       group_name,
@@ -83,9 +83,9 @@ const createWaypointGroup = async (req, res) => {
       waypoints: sortedWaypoints,
       is_active: true
     });
-    
+
     await group.save();
-    
+
     res.json({
       status: 'success',
       message: 'Waypoint group created successfully',
@@ -108,26 +108,26 @@ const updateWaypointGroup = async (req, res) => {
   try {
     const updates = { ...req.body };
     updates.updated_at = new Date();
-    
+
     delete updates.group_id;
-    
+
     if (updates.waypoints && updates.waypoints.length > 0) {
       updates.waypoints = updates.waypoints.sort((a, b) => a.order - b.order);
     }
-    
+
     const group = await WaypointGroup.findOneAndUpdate(
       { group_id: req.params.group_id },
       { $set: updates },
       { new: true }
     );
-    
+
     if (!group) {
       return res.status(404).json({
         status: 'error',
         message: 'Waypoint group not found'
       });
     }
-    
+
     res.json({
       status: 'success',
       message: 'Waypoint group updated successfully',
@@ -150,14 +150,14 @@ const deleteWaypointGroup = async (req, res) => {
   try {
     // Hard delete - permanently remove from database
     const group = await WaypointGroup.findOneAndDelete({ group_id: req.params.group_id });
-    
+
     if (!group) {
       return res.status(404).json({
         status: 'error',
         message: 'Waypoint group not found'
       });
     }
-    
+
     res.json({
       status: 'success',
       message: 'Waypoint group deleted permanently'
@@ -172,10 +172,39 @@ const deleteWaypointGroup = async (req, res) => {
   }
 };
 
+// @desc    Get all unique waypoint names (for autocomplete)
+// @route   GET /api/waypoint-groups/waypoints/unique
+// @access  Private
+const getUniqueWaypoints = async (req, res) => {
+  try {
+    // Get all unique waypoint names from all groups
+    const result = await WaypointGroup.aggregate([
+      { $unwind: "$waypoints" },
+      { $group: { _id: "$waypoints.name" } },
+      { $sort: { _id: 1 } }
+    ]);
+
+    const waypointNames = result.map(item => item._id);
+
+    res.json({
+      success: true,
+      waypoints: waypointNames
+    });
+  } catch (error) {
+    console.error('Error fetching unique waypoints:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch unique waypoints',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getWaypointGroups,
   getWaypointGroupById,
   createWaypointGroup,
   updateWaypointGroup,
-  deleteWaypointGroup
+  deleteWaypointGroup,
+  getUniqueWaypoints
 };

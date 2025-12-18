@@ -239,18 +239,18 @@ const getPassengersByDateRange = async (req, res) => {
 // @access  Private
 const getStats = async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date, bus_id } = req.query;
 
     let query = {};
-    if (date) {
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
+    if (bus_id && bus_id !== 'ALL') {
+      query.bus_id = bus_id;
+    }
 
+    if (date) {
+      const dateStr = date.substring(0, 10);
       query.entry_timestamp = {
-        $gte: startOfDay,
-        $lte: endOfDay
+        $gte: new Date(dateStr + 'T00:00:00.000Z'),
+        $lte: new Date(dateStr + 'T23:59:59.999Z')
       };
     }
 

@@ -17,12 +17,12 @@ const getTrips = async (req, res) => {
     }
 
     const dateStr = date.substring(0, 10);
-    const requestedDate = new Date(dateStr);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    requestedDate.setHours(0, 0, 0, 0);
 
-    const isHistoricalDate = requestedDate < today;
+    // Get current date in Sri Lanka time (+05:30)
+    const nowLocal = new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000));
+    const todayStr = nowLocal.toISOString().substring(0, 10);
+
+    const isHistoricalDate = dateStr < todayStr;
 
     // Build bus query
     const busQuery = {};
@@ -135,20 +135,25 @@ const getTrips = async (req, res) => {
             const tripData = busTrips[i];
             const entryTime = new Date(tripData.firstEntry);
             const exitTime = new Date(tripData.lastEntry);
-            const boardingTime = `${String(entryTime.getUTCHours()).padStart(2, '0')}:${String(entryTime.getUTCMinutes()).padStart(2, '0')}`;
-            const endTime = `${String(exitTime.getUTCHours()).padStart(2, '0')}:${String(exitTime.getUTCMinutes()).padStart(2, '0')}`;
+            // Convert UTC to local time for display names if needed
+            // If the passenger data timestamp is UTC, we should show it in local time (+05:30)
+            const showLocal = (dateObj) => {
+              const local = new Date(dateObj.getTime() + (5.5 * 60 * 60 * 1000));
+              return `${String(local.getUTCHours()).padStart(2, '0')}:${String(local.getUTCMinutes()).padStart(2, '0')}`;
+            };
 
-            const scheduledTripId = `SCHEDULED_${busId}_${dateStr}_${i}`;
+            const boardingTimeLocal = showLocal(entryTime);
+            const endTimeLocal = showLocal(exitTime);
 
             allTrips.push({
               trip_id: scheduledTripId,
-              trip_name: tripData.route_name ? `${tripData.route_name} - ${boardingTime}` : `Trip ${i + 1} - ${boardingTime}`,
+              trip_name: tripData.route_name ? `${tripData.route_name} - ${boardingTimeLocal}` : `Trip ${i + 1} - ${boardingTimeLocal}`,
               bus_id: busId,
               route: tripData.route_name || 'Unknown Route',
-              boarding_start_time: boardingTime,
-              departure_time: boardingTime,
-              end_time: endTime,
-              estimated_arrival_time: endTime,
+              boarding_start_time: boardingTimeLocal,
+              departure_time: boardingTimeLocal,
+              end_time: endTimeLocal,
+              estimated_arrival_time: endTimeLocal,
               start_time: tripData.firstEntry,
               finish_time: tripData.lastEntry,
               scheduled: false,
@@ -162,51 +167,27 @@ const getTrips = async (req, res) => {
         console.log(`✅ Derived ${allTrips.length} trips from passenger data`);
       }
 
+      // FALLBACK: If we still have no trips for this historical date, use the current schedule/powerConfigs
+      if (allTrips.length === 0) {
+        console.log(`⚠️ No trips found for historical date ${dateStr} (no history, no derived). Falling back to current schedule.`);
+        const fallbackTrips = await getScheduledTripsForDate(dateStr, busQuery);
+        allTrips.push(...fallbackTrips);
+      }
+
     } else {
       // For today or future dates, use the current schedule
       console.log(`📅 Current/future date ${dateStr} - using scheduled trips`);
 
-      const schedules = await BusSchedule.find(busQuery);
-
-      console.log(`📅 Found ${schedules.length} schedule(s) for query:`, busQuery);
-
-      for (const schedule of schedules) {
-        console.log(`📋 Schedule for ${schedule.bus_id}: ${schedule.trips?.length || 0} trips`);
-
-        if (schedule.trips && Array.isArray(schedule.trips)) {
-          for (let i = 0; i < schedule.trips.length; i++) {
-            const trip = schedule.trips[i];
-            const departureTime = trip.departure_time || trip.boarding_start_time;
-
-            console.log(`  Trip ${i}: ${trip.trip_name} - Depart: ${departureTime}`);
-
-            if (departureTime) {
-              const scheduledTripId = `SCHEDULED_${schedule.bus_id}_${dateStr}_${i}`;
-
-              allTrips.push({
-                trip_id: scheduledTripId,
-                trip_name: trip.trip_name,
-                bus_id: schedule.bus_id,
-                route: trip.route,
-                boarding_start_time: trip.boarding_start_time,
-                departure_time: trip.departure_time,
-                end_time: trip.estimated_arrival_time,
-                estimated_arrival_time: trip.estimated_arrival_time,
-                start_time: new Date(`${dateStr}T${departureTime}:00Z`),
-                finish_time: trip.estimated_arrival_time ? new Date(`${dateStr}T${trip.estimated_arrival_time}:00Z`) : null,
-                scheduled: true,
-                trip_index: i
-              });
-            }
-          }
-        }
-      }
+      const scheduledTrips = await getScheduledTripsForDate(dateStr, busQuery);
+      allTrips.push(...scheduledTrips);
 
       console.log(`✅ Returning ${allTrips.length} scheduled trips`);
 
       // Count passengers for each scheduled trip (only for current/future)
       for (const trip of allTrips) {
         const departureTime = trip.departure_time;
+        if (!departureTime) continue;
+
         const [depHour] = departureTime.split(':').map(Number);
 
         const startWindow = new Date(`${dateStr}T${String(Math.max(0, depHour - 2)).padStart(2, '0')}:00:00Z`);
@@ -225,13 +206,18 @@ const getTrips = async (req, res) => {
     }
 
     // Sort by departure time
-    allTrips.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+    allTrips.sort((a, b) => {
+      const timeA = a.boarding_start_time || a.departure_time || '00:00';
+      const timeB = b.boarding_start_time || b.departure_time || '00:00';
+      return timeA.localeCompare(timeB);
+    });
 
     res.json({
       status: 'success',
       count: allTrips.length,
       trips: allTrips,
-      source: isHistoricalDate ? 'passenger_data' : 'scheduled_trips'
+      source: allTrips.length > 0 && allTrips[0].from_history ? 'history' :
+        (allTrips.length > 0 && allTrips[0].derived_from_data ? 'passenger_data' : 'scheduled_trips')
     });
   } catch (error) {
     console.error('Error fetching trips:', error);
@@ -242,6 +228,48 @@ const getTrips = async (req, res) => {
     });
   }
 };
+
+// Helper function to get scheduled trips for any date (reusable logic)
+async function getScheduledTripsForDate(dateStr, busQuery) {
+  const allTrips = [];
+  const mongoose = require('mongoose');
+
+  let schedules = await BusSchedule.find(busQuery);
+
+  // If no schedules found in bus_schedules, check powerConfigs
+  if (schedules.length === 0) {
+    const PowerConfig = mongoose.models.PowerConfig || mongoose.model('PowerConfig', new mongoose.Schema({}, { strict: false }), 'powerConfigs');
+    schedules = await PowerConfig.find(busQuery);
+  }
+
+  for (const schedule of schedules) {
+    if (schedule.trips && Array.isArray(schedule.trips)) {
+      for (let i = 0; i < schedule.trips.length; i++) {
+        const trip = schedule.trips[i];
+        const departureTime = trip.departure_time || trip.boarding_start_time;
+
+        if (departureTime) {
+          const scheduledTripId = `SCHEDULED_${schedule.bus_id}_${dateStr}_${i}`;
+          allTrips.push({
+            trip_id: scheduledTripId,
+            trip_name: trip.trip_name,
+            bus_id: schedule.bus_id,
+            route: trip.route,
+            boarding_start_time: trip.boarding_start_time,
+            departure_time: trip.departure_time,
+            end_time: trip.estimated_arrival_time,
+            estimated_arrival_time: trip.estimated_arrival_time,
+            start_time: new Date(`${dateStr}T${departureTime}:00Z`),
+            finish_time: trip.estimated_arrival_time ? new Date(`${dateStr}T${trip.estimated_arrival_time}:00Z`) : null,
+            scheduled: true,
+            trip_index: i
+          });
+        }
+      }
+    }
+  }
+  return allTrips;
+}
 
 // @desc    Debug endpoint to see raw trip data
 // @route   GET /api/trips/debug

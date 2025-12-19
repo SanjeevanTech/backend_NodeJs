@@ -129,7 +129,15 @@ const getPassengers = async (req, res) => {
           }
         } else {
           // For current/future dates, use the schedule
-          const schedule = await BusSchedule.findOne({ bus_id: busIdFromTrip });
+          let schedule = await BusSchedule.findOne({ bus_id: busIdFromTrip });
+
+          // FALLBACK: If no record in BusSchedule, check powerConfigs
+          if (!schedule) {
+            console.log(`   ⚠️ No schedule in bus_schedules for ${busIdFromTrip}, checking powerConfigs fallback`);
+            const mongoose = require('mongoose');
+            const PowerConfig = mongoose.models.PowerConfig || mongoose.model('PowerConfig', new mongoose.Schema({}, { strict: false }), 'powerConfigs');
+            schedule = await PowerConfig.findOne({ bus_id: busIdFromTrip });
+          }
 
           if (schedule && schedule.trips && schedule.trips[tripIndex]) {
             const scheduledTrip = schedule.trips[tripIndex];

@@ -6,17 +6,17 @@ const BusSchedule = require('../models/BusSchedule');
 // @access  Private
 const getUnmatched = async (req, res) => {
   try {
-    const { 
-      date, 
-      type, 
+    const {
+      date,
+      type,
       bus_id,
       trip_id,
-      limit = 50, 
-      skip = 0 
+      limit = 50,
+      skip = 0
     } = req.query;
-    
+
     let query = {};
-    
+
     // Handle scheduled trip filtering
     if (trip_id && trip_id !== 'ALL') {
       if (trip_id.startsWith('SCHEDULED_')) {
@@ -24,25 +24,33 @@ const getUnmatched = async (req, res) => {
         const tripIndex = parseInt(parts[parts.length - 1]);
         const busIdFromTrip = parts.slice(1, -2).join('_');
         const dateFromTrip = parts[parts.length - 2];
-        
-        const schedule = await BusSchedule.findOne({ bus_id: busIdFromTrip });
-        
+
+        let schedule = await BusSchedule.findOne({ bus_id: busIdFromTrip });
+
+        // FALLBACK: If no record in BusSchedule, check powerConfigs
+        if (!schedule) {
+          console.log(`   ⚠️ No schedule in bus_schedules for ${busIdFromTrip}, checking powerConfigs fallback`);
+          const mongoose = require('mongoose');
+          const PowerConfig = mongoose.models.PowerConfig || mongoose.model('PowerConfig', new mongoose.Schema({}, { strict: false }), 'powerConfigs');
+          schedule = await PowerConfig.findOne({ bus_id: busIdFromTrip });
+        }
+
         if (schedule && schedule.trips && schedule.trips[tripIndex]) {
           const scheduledTrip = schedule.trips[tripIndex];
           const departureTime = scheduledTrip.departure_time || scheduledTrip.boarding_start_time;
           const [depHour, depMin] = departureTime.split(':').map(Number);
-          
+
           console.log(`🎯 Filtering unmatched for scheduled trip: ${trip_id}`);
           console.log(`   Departure time: ${departureTime}`);
           console.log(`   Date: ${dateFromTrip}`);
-          
+
           // Create time window: ±30 minutes around departure time (more precise filtering)
           const departureDate = new Date(`${dateFromTrip}T${departureTime}:00`);
           const startWindow = new Date(departureDate.getTime() - 30 * 60 * 1000); // 30 min before
           const endWindow = new Date(departureDate.getTime() + 30 * 60 * 1000);   // 30 min after
-          
+
           console.log(`   Time window: ${startWindow.toISOString()} to ${endWindow.toISOString()}`);
-          
+
           query.bus_id = busIdFromTrip;
           query.timestamp = {
             $gte: startWindow,
@@ -53,7 +61,7 @@ const getUnmatched = async (req, res) => {
         query.trip_id = trip_id;
       }
     }
-    
+
     // Filter by date
     if (date && !query.timestamp) {
       const dateStr = date.substring(0, 10);
@@ -62,17 +70,17 @@ const getUnmatched = async (req, res) => {
         $lte: new Date(dateStr + 'T23:59:59.999Z')
       };
     }
-    
+
     // Filter by type
     if (type) {
       query.type = type.toUpperCase();
     }
-    
+
     // Filter by bus_id
     if (bus_id && bus_id !== 'ALL' && !query.bus_id) {
       query.bus_id = bus_id;
     }
-    
+
     const [unmatched, total] = await Promise.all([
       UnmatchedPassenger.find(query)
         .select('-face_embedding -__v')
@@ -82,7 +90,7 @@ const getUnmatched = async (req, res) => {
         .lean(),
       UnmatchedPassenger.countDocuments(query)
     ]);
-    
+
     res.json({
       status: 'success',
       total,

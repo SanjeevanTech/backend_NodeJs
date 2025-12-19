@@ -23,9 +23,9 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
@@ -41,7 +41,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // ============================================
 // DATABASE CONNECTION
 // ============================================
-const MONGODB_URI = process.env.MONGODB_URI || 
+const MONGODB_URI = process.env.MONGODB_URI ||
   'mongodb+srv://sanjeeBusPassenger:Hz3czXqVoc4ThTiO@buspassenger.lskaqo5.mongodb.net/bus_passenger_db?retryWrites=true&w=majority&appName=BusPassenger';
 
 mongoose.connect(MONGODB_URI, {
@@ -110,6 +110,10 @@ app.use('/api/bus-routes', busRouteRoutes);
 // Waypoint Group Routes (Protected)
 const waypointGroupRoutes = require('./routes/waypointGroupRoutes');
 app.use('/api/waypoint-groups', waypointGroupRoutes);
+
+// Contractor Routes (Protected)
+const contractorRoutes = require('./routes/contractorRoutes');
+app.use('/api/contractors', contractorRoutes);
 
 // ============================================
 // PYTHON SERVER PROXY

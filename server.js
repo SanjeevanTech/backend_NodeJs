@@ -120,7 +120,7 @@ app.use('/api/contractors', contractorRoutes);
 // ============================================
 const axios = require('axios');
 const { verifyToken } = require('./middleware/auth');
-const PYTHON_SERVER = process.env.PYTHON_SERVER_URL || 'http://127.0.0.1:8888';
+const PYTHON_SERVER = process.env.PYTHON_SERVER_URL || 'http://10.192.150.50:8888';
 
 // Python server proxy (Protected)
 app.get('/api/python/*', verifyToken, async (req, res) => {
@@ -195,12 +195,16 @@ app.use((req, res) => {
 // ============================================
 // START SERVER
 // ============================================
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Backend server running on port ${PORT}`);
-  console.log(`📊 API: http://localhost:${PORT}/api/passengers`);
-  console.log(`🎫 Fare System: Sri Lankan Stage-based (NTC 2025)`);
-  console.log(`📋 Fare Stages API: http://localhost:${PORT}/api/fare/stages`);
-  console.log(`🔗 Python Proxy: Forwarding /api/python/* to ${PYTHON_SERVER}`);
-  console.log(`✅ MVC Pattern: Models → Controllers → Routes`);
-});
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Backend server running on port ${PORT}`);
+    console.log(`📊 API: http://localhost:${PORT}/api/passengers`);
+    console.log(`🎫 Fare System: Sri Lankan Stage-based (NTC 2025)`);
+    console.log(`📋 Fare Stages API: http://localhost:${PORT}/api/fare/stages`);
+    console.log(`🔗 Python Proxy: Forwarding /api/python/* to ${PYTHON_SERVER}`);
+    console.log(`✅ MVC Pattern: Models → Controllers → Routes`);
+  });
+}
+
+module.exports = app;

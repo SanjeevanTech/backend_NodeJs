@@ -6,7 +6,7 @@ const SeasonTicketMember = require('../models/SeasonTicketMember');
 const getMembers = async (req, res) => {
   try {
     const { active_only } = req.query;
-    
+
     let query = {};
     if (active_only === 'true') {
       const now = new Date();
@@ -16,11 +16,11 @@ const getMembers = async (req, res) => {
         valid_until: { $gte: now }
       };
     }
-    
+
     const members = await SeasonTicketMember.find(query)
       .select('-face_embedding')
       .sort({ created_at: -1 });
-    
+
     res.json({
       status: 'success',
       total: members.length,
@@ -41,17 +41,17 @@ const getMembers = async (req, res) => {
 // @access  Private
 const getMemberById = async (req, res) => {
   try {
-    const member = await SeasonTicketMember.findOne({ 
-      member_id: req.params.member_id 
+    const member = await SeasonTicketMember.findOne({
+      member_id: req.params.member_id
     });
-    
+
     if (!member) {
       return res.status(404).json({
         status: 'error',
         message: 'Member not found'
       });
     }
-    
+
     res.json({
       status: 'success',
       member: member
@@ -84,20 +84,20 @@ const createMember = async (req, res) => {
       from_location,
       to_location
     } = req.body;
-    
+
     if (!name || !face_embedding || !valid_from || !valid_until) {
       return res.status(400).json({
         status: 'error',
         message: 'Missing required fields: name, face_embedding, valid_from, valid_until'
       });
     }
-    
+
     // Auto-generate member_id
     const count = await SeasonTicketMember.countDocuments();
     const member_id = `ST${new Date().getFullYear()}${String(count + 1).padStart(4, '0')}`;
-    
+
     console.log(`✅ Auto-generated Member ID: ${member_id}`);
-    
+
     const member = new SeasonTicketMember({
       member_id,
       name,
@@ -109,11 +109,12 @@ const createMember = async (req, res) => {
       valid_routes: valid_routes || [],
       valid_from: new Date(valid_from),
       valid_until: new Date(valid_until),
+      needs_hardware_sync: true, // Flag for ESP32 model sync
       is_active: true
     });
-    
+
     await member.save();
-    
+
     res.json({
       status: 'success',
       message: 'Season ticket member created successfully',
@@ -136,22 +137,22 @@ const updateMember = async (req, res) => {
   try {
     const updates = { ...req.body };
     updates.updated_at = new Date();
-    
+
     delete updates.member_id;
-    
+
     const member = await SeasonTicketMember.findOneAndUpdate(
       { member_id: req.params.member_id },
       { $set: updates },
       { new: true }
     );
-    
+
     if (!member) {
       return res.status(404).json({
         status: 'error',
         message: 'Member not found'
       });
     }
-    
+
     res.json({
       status: 'success',
       message: 'Member updated successfully',
@@ -173,17 +174,17 @@ const updateMember = async (req, res) => {
 const deleteMember = async (req, res) => {
   try {
     // Hard delete - permanently remove from database
-    const member = await SeasonTicketMember.findOneAndDelete({ 
-      member_id: req.params.member_id 
+    const member = await SeasonTicketMember.findOneAndDelete({
+      member_id: req.params.member_id
     });
-    
+
     if (!member) {
       return res.status(404).json({
         status: 'error',
         message: 'Member not found'
       });
     }
-    
+
     res.json({
       status: 'success',
       message: 'Member deleted permanently'
@@ -204,7 +205,7 @@ const deleteMember = async (req, res) => {
 const getStats = async (req, res) => {
   try {
     const now = new Date();
-    
+
     const total = await SeasonTicketMember.countDocuments();
     const active = await SeasonTicketMember.countDocuments({
       is_active: true,
@@ -217,7 +218,7 @@ const getStats = async (req, res) => {
     const upcoming = await SeasonTicketMember.countDocuments({
       valid_from: { $gt: now }
     });
-    
+
     res.json({
       status: 'success',
       stats: {

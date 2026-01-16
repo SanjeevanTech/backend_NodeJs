@@ -3,7 +3,7 @@ const WaypointGroup = require('../models/WaypointGroup');
 
 // @desc    Get all bus routes
 // @route   GET /api/bus-routes
-// @access  Private
+// @access  Private   
 const getBusRoutes = async (req, res) => {
   try {
     const { active_only } = req.query;

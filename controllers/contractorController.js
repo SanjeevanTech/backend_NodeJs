@@ -67,6 +67,7 @@ const upsertContractor = async (req, res) => {
             face_embedding,
             embedding_size: embedding_size || face_embedding.length,
             face_photo_url,
+            needs_hardware_sync: true, // Flag for ESP32 model sync
             updated_at: Date.now()
         };
 

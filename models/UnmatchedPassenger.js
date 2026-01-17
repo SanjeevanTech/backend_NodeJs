@@ -15,7 +15,8 @@ const unmatchedPassengerSchema = new mongoose.Schema({
     latitude: Number,
     longitude: Number,
     device_id: String,
-    timestamp: String
+    timestamp: String,
+    location_name: String
   },
   timestamp: Date,
   best_similarity_found: Number,

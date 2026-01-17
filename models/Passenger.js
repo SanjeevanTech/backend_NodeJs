@@ -9,13 +9,15 @@ const passengerSchema = new mongoose.Schema({
     latitude: Number,
     longitude: Number,
     device_id: String,
-    timestamp: String
+    timestamp: String,
+    location_name: String
   },
   exitLocation: {
     latitude: Number,
     longitude: Number,
     device_id: String,
-    timestamp: String
+    timestamp: String,
+    location_name: String
   },
   entry_timestamp: Date,
   exit_timestamp: Date,

@@ -17,9 +17,7 @@ app.use(cookieParser());
 const allowedOrigins = [
   'http://localhost:5173',
   process.env.FRONTEND_URL,
-  'https://frontend-indol-one-90.vercel.app',
-  'https://frontend-git-main-sanjeevan-s-projects.vercel.app',
-  'https://frontend-4j4yi542s-sanjeevan-s-projects.vercel.app',
+  'https://bus-passenger-tracking.vercel.app', // Added common Vercel URL pattern
 ].filter(Boolean);
 
 app.use(cors({

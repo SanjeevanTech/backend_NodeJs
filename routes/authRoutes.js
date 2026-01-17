@@ -121,6 +121,7 @@ router.post('/login', async (req, res) => {
     res.json({
       success: true,
       message: 'Login successful',
+      token, // Send token for non-cookie clients
       user: {
         id: user._id,
         username: user.username,
@@ -170,7 +171,7 @@ router.get('/me', verifyToken, (req, res) => {
 router.get('/users', verifyToken, requireRole('admin'), async (req, res) => {
   try {
     const users = await User.find().select('-password').sort({ createdAt: -1 });
-    
+
     res.json({
       success: true,
       users
@@ -190,9 +191,9 @@ router.get('/users', verifyToken, requireRole('admin'), async (req, res) => {
 router.put('/users/:id', verifyToken, requireRole('admin'), async (req, res) => {
   try {
     const { role, isActive } = req.body;
-    
+
     const user = await User.findById(req.params.id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -225,7 +226,7 @@ router.put('/users/:id', verifyToken, requireRole('admin'), async (req, res) => 
 router.delete('/users/:id', verifyToken, requireRole('admin'), async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,

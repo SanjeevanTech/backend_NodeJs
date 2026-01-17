@@ -3,6 +3,26 @@ const path = require('path');
 
 const CONFIG_FILE = path.join(__dirname, '../device_config.json');
 
+const getAllDeviceConfigs = (req, res) => {
+    try {
+        if (!fs.existsSync(CONFIG_FILE)) {
+            return res.json({ default: { wifi_ssid: '', wifi_password: '', server_url: '' } });
+        }
+        const configData = fs.readFileSync(CONFIG_FILE, 'utf8');
+        const allConfigs = JSON.parse(configData);
+        res.json({
+            status: 'success',
+            configs: allConfigs
+        });
+    } catch (error) {
+        console.error('Error reading all device configs:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to read device configs'
+        });
+    }
+};
+
 // @desc    Get device configuration
 // @route   GET /api/device-config/get
 // @access  Public (or semi-protected)
@@ -20,20 +40,20 @@ const getDeviceConfig = (req, res) => {
         const configData = fs.readFileSync(CONFIG_FILE, 'utf8');
         const allConfigs = JSON.parse(configData);
 
-        // Try to find config for specific bus, or fall back to default
-        let config = allConfigs[bus_id] || allConfigs['default'];
-
-        if (!config) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'No configuration found for this bus or default'
-            });
-        }
+        // SMART MERGE: Start with defaults, then overwrite with specific bus config if it exists
+        const defaultConfig = allConfigs['default'] || {};
+        const busConfig = allConfigs[bus_id] || {};
+        
+        // Merge them: Bus config wins, but missing fields come from default
+        const mergedConfig = {
+            ...defaultConfig,
+            ...busConfig
+        };
 
         res.json({
             status: 'success',
             bus_id: bus_id || 'default',
-            ...config
+            ...mergedConfig
         });
     } catch (error) {
         console.error('Error reading device config:', error);
@@ -52,11 +72,9 @@ const updateDeviceConfig = (req, res) => {
     try {
         const { bus_id, wifi_ssid, wifi_password, server_url } = req.body;
 
-        if (!wifi_ssid || !wifi_password || !server_url) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'wifi_ssid, wifi_password, and server_url are required'
-            });
+        // Validation: Only require bus_id
+        if (!bus_id && bus_id !== 'default') {
+             // If no bus_id, it might be a global update
         }
 
         let allConfigs = {};
@@ -65,10 +83,13 @@ const updateDeviceConfig = (req, res) => {
         }
 
         const targetBus = bus_id || 'default';
+        
+        // Update only the fields provided in the request
+        const currentConfig = allConfigs[targetBus] || {};
         allConfigs[targetBus] = {
-            wifi_ssid,
-            wifi_password,
-            server_url
+            wifi_ssid: wifi_ssid !== undefined ? wifi_ssid : currentConfig.wifi_ssid,
+            wifi_password: wifi_password !== undefined ? wifi_password : currentConfig.wifi_password,
+            server_url: server_url !== undefined ? server_url : currentConfig.server_url
         };
 
         fs.writeFileSync(CONFIG_FILE, JSON.stringify(allConfigs, null, 2), 'utf8');
@@ -90,5 +111,6 @@ const updateDeviceConfig = (req, res) => {
 
 module.exports = {
     getDeviceConfig,
-    updateDeviceConfig
+    updateDeviceConfig,
+    getAllDeviceConfigs
 };

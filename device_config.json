@@ -1,0 +1,12 @@
+{
+    "default": {
+        "wifi_ssid": "Sanjeevan",
+        "wifi_password": "12345678",
+        "server_url": "http://52.66.122.5:8888"
+    },
+    "BUS_JC_001": {
+        "wifi_ssid": "Sanjeevan",
+        "wifi_password": "12345678",
+        "server_url": "http://10.192.150.50:8888"
+    }
+}

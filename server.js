@@ -113,6 +113,10 @@ app.use('/api/waypoint-groups', waypointGroupRoutes);
 const contractorRoutes = require('./routes/contractorRoutes');
 app.use('/api/contractors', contractorRoutes);
 
+// Device Config Routes (Simplified for ESP32)
+const deviceConfigRoutes = require('./routes/deviceConfigRoutes');
+app.use('/api/device-config', deviceConfigRoutes);
+
 // ============================================
 // PYTHON SERVER PROXY
 // ============================================

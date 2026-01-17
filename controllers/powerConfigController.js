@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 // Power Config Model (flexible schema for powerConfigs collection)
-const PowerConfig = mongoose.model('PowerConfig', 
+const PowerConfig = mongoose.model('PowerConfig',
   new mongoose.Schema({
     bus_id: { type: String, required: true, unique: true },
     bus_name: String,
@@ -18,7 +18,7 @@ const PowerConfig = mongoose.model('PowerConfig',
     power_off_after_minutes: { type: Number, default: 15 },
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now }
-  }, { strict: false }), 
+  }, { strict: false }),
   'powerConfigs'
 );
 
@@ -31,7 +31,7 @@ const BusSchedule = require('../models/BusSchedule');
 const getAllPowerConfigs = async (req, res) => {
   try {
     const configs = await PowerConfig.find({}).sort({ bus_id: 1 });
-    
+
     // Return Python-compatible format: { bus_id: config }
     // This allows frontend to use Object.keys() to get bus IDs
     const busesObject = {};
@@ -52,8 +52,16 @@ const getAllPowerConfigs = async (req, res) => {
         last_updated: config.updated_at || config.created_at
       };
     });
-    
-    res.json(busesObject);
+
+    // Add current server time in Sri Lanka (+05:30) for ESP32 sync
+    const now = new Date();
+    const slNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const serverTimeStr = slNow.toISOString().replace('T', ' ').substring(0, 19);
+
+    res.json({
+      ...busesObject,
+      current_server_time: serverTimeStr
+    });
   } catch (error) {
     console.error('Error fetching power configs:', error);
     res.status(500).json({
@@ -70,17 +78,23 @@ const getAllPowerConfigs = async (req, res) => {
 const getPowerConfig = async (req, res) => {
   try {
     const config = await PowerConfig.findOne({ bus_id: req.params.bus_id });
-    
+
     if (!config) {
       return res.status(404).json({
         status: 'error',
         message: 'Power config not found for this bus'
       });
     }
-    
+
+    // Add current server time in Sri Lanka (+05:30) for ESP32 sync
+    const now = new Date();
+    const slNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const serverTimeStr = slNow.toISOString().replace('T', ' ').substring(0, 19);
+
     res.json({
       status: 'success',
-      config: config
+      config: config,
+      current_server_time: serverTimeStr
     });
   } catch (error) {
     console.error('Error fetching power config:', error);
@@ -99,19 +113,19 @@ const getPowerConfig = async (req, res) => {
 const savePowerConfig = async (req, res) => {
   try {
     const { bus_id } = req.body;
-    
+
     if (!bus_id) {
       return res.status(400).json({
         status: 'error',
         message: 'bus_id is required'
       });
     }
-    
+
     const configData = {
       ...req.body,
       updated_at: new Date()
     };
-    
+
     // If trip_windows exist, ensure they have default active status
     if (configData.trip_windows && Array.isArray(configData.trip_windows)) {
       configData.trip_windows = configData.trip_windows.map(window => ({
@@ -119,16 +133,16 @@ const savePowerConfig = async (req, res) => {
         active: window.active !== undefined ? window.active : true
       }));
     }
-    
+
     const result = await PowerConfig.updateOne(
       { bus_id: bus_id },
       { $set: configData },
       { upsert: true }
     );
-    
+
     // Fetch the updated config
     const updatedConfig = await PowerConfig.findOne({ bus_id: bus_id });
-    
+
     res.json({
       status: 'success',
       message: result.upsertedCount > 0 ? 'Power config created' : 'Power config updated',
@@ -150,14 +164,14 @@ const savePowerConfig = async (req, res) => {
 const deletePowerConfig = async (req, res) => {
   try {
     const result = await PowerConfig.deleteOne({ bus_id: req.params.bus_id });
-    
+
     if (result.deletedCount === 0) {
       return res.status(404).json({
         status: 'error',
         message: 'Power config not found'
       });
     }
-    
+
     res.json({
       status: 'success',
       message: 'Power config deleted successfully'
@@ -179,21 +193,21 @@ const toggleSmartPower = async (req, res) => {
   try {
     const { bus_id } = req.params;
     const { enabled } = req.body;
-    
+
     const config = await PowerConfig.findOne({ bus_id });
-    
+
     if (!config) {
       return res.status(404).json({
         status: 'error',
         message: 'Power config not found'
       });
     }
-    
+
     config.smart_power_enabled = enabled !== undefined ? enabled : !config.smart_power_enabled;
     config.updated_at = new Date();
-    
+
     await config.save();
-    
+
     res.json({
       status: 'success',
       message: `Smart power ${config.smart_power_enabled ? 'enabled' : 'disabled'}`,
@@ -216,10 +230,10 @@ const getPowerConfigStats = async (req, res) => {
   try {
     const total = await PowerConfig.countDocuments();
     const smartEnabled = await PowerConfig.countDocuments({ smart_power_enabled: true });
-    const withTripWindows = await PowerConfig.countDocuments({ 
-      trip_windows: { $exists: true, $ne: [] } 
+    const withTripWindows = await PowerConfig.countDocuments({
+      trip_windows: { $exists: true, $ne: [] }
     });
-    
+
     res.json({
       status: 'success',
       stats: {
@@ -245,14 +259,14 @@ const getPowerConfigStats = async (req, res) => {
 const syncPowerConfig = async (req, res) => {
   try {
     const { bus_id } = req.body;
-    
+
     if (!bus_id) {
       return res.status(400).json({
         status: 'error',
         message: 'bus_id is required'
       });
     }
-    
+
     const schedule = await BusSchedule.findOne({ bus_id });
     console.log('Syncing power config for bus:', bus_id);
     console.log('Found schedule:', schedule ? 'Yes' : 'No');
@@ -262,7 +276,7 @@ const syncPowerConfig = async (req, res) => {
         console.log('First trip:', JSON.stringify(schedule.trips[0], null, 2));
       }
     }
-    
+
     // If no schedule or no trips, set default times (full day operation)
     if (!schedule || !schedule.trips || schedule.trips.length === 0) {
       const configData = {
@@ -271,13 +285,13 @@ const syncPowerConfig = async (req, res) => {
         trip_end: '23:59',
         updated_at: new Date()
       };
-      
+
       await PowerConfig.updateOne(
         { bus_id },
         { $set: configData },
         { upsert: true }
       );
-      
+
       return res.json({
         status: 'success',
         message: 'No trips found - power config set to full day operation',
@@ -286,29 +300,29 @@ const syncPowerConfig = async (req, res) => {
         bus_id
       });
     }
-    
+
     let earliestStart = null;
     let latestEnd = null;
     const tripWindows = [];
-    
+
     schedule.trips.forEach(trip => {
       // Use boarding_start_time or departure_time as start
       const startTime = trip.boarding_start_time || trip.departure_time || trip.start_time;
       // Use estimated_arrival_time or end_time as end
       const endTime = trip.estimated_arrival_time || trip.end_time;
-      
+
       if (startTime) {
         if (earliestStart === null || startTime < earliestStart) {
           earliestStart = startTime;
         }
       }
-      
+
       if (endTime) {
         if (latestEnd === null || endTime > latestEnd) {
           latestEnd = endTime;
         }
       }
-      
+
       // Create trip window for each trip
       if (startTime && endTime) {
         tripWindows.push({
@@ -319,14 +333,14 @@ const syncPowerConfig = async (req, res) => {
         });
       }
     });
-    
+
     // Fallback to default times if no valid times found
     if (earliestStart === null) earliestStart = '00:00';
     if (latestEnd === null) latestEnd = '23:59';
-    
+
     console.log('Calculated times - Start:', earliestStart, 'End:', latestEnd);
     console.log('Trip windows created:', tripWindows.length);
-    
+
     // Update or create power config with calculated times and trip windows
     const configData = {
       bus_id,
@@ -336,13 +350,13 @@ const syncPowerConfig = async (req, res) => {
       trip_windows: tripWindows,
       updated_at: new Date()
     };
-    
+
     await PowerConfig.updateOne(
       { bus_id },
       { $set: configData },
       { upsert: true }
     );
-    
+
     res.json({
       status: 'success',
       message: 'Power config synced with schedule',

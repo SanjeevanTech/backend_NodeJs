@@ -65,8 +65,8 @@ const getTrips = async (req, res) => {
                   departure_time: trip.departure_time,
                   end_time: trip.estimated_arrival_time,
                   estimated_arrival_time: trip.estimated_arrival_time,
-                  start_time: new Date(`${dateStr}T${departureTime}:00Z`),
-                  finish_time: trip.estimated_arrival_time ? new Date(`${dateStr}T${trip.estimated_arrival_time}:00Z`) : null,
+                  start_time: new Date(`${dateStr}T${departureTime}:00.000+05:30`),
+                  finish_time: trip.estimated_arrival_time ? new Date(`${dateStr}T${trip.estimated_arrival_time}:00.000+05:30`) : null,
                   scheduled: true,
                   trip_index: i,
                   from_history: true
@@ -261,8 +261,8 @@ async function getScheduledTripsForDate(dateStr, busQuery) {
             departure_time: trip.departure_time,
             end_time: trip.estimated_arrival_time,
             estimated_arrival_time: trip.estimated_arrival_time,
-            start_time: new Date(`${dateStr}T${departureTime}:00Z`),
-            finish_time: trip.estimated_arrival_time ? new Date(`${dateStr}T${trip.estimated_arrival_time}:00Z`) : null,
+            start_time: new Date(`${dateStr}T${departureTime}:00.000+05:30`),
+            finish_time: trip.estimated_arrival_time ? new Date(`${dateStr}T${trip.estimated_arrival_time}:00.000+05:30`) : null,
             scheduled: true,
             trip_index: i
           });

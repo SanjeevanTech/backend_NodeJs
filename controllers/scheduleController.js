@@ -43,8 +43,9 @@ const saveBusSchedule = async (req, res) => {
 
     // Also save to schedule history for today's date
     // This preserves the schedule for historical lookup
-    const today = new Date();
-    const todayStr = today.toISOString().substring(0, 10); // YYYY-MM-DD
+    const now = new Date();
+    const slNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const todayStr = slNow.toISOString().substring(0, 10); // YYYY-MM-DD
 
     const historyData = {
       bus_id: req.body.bus_id,
@@ -82,7 +83,26 @@ const saveBusSchedule = async (req, res) => {
 const getScheduledTrips = async (req, res) => {
   try {
     const { date, bus_id } = req.query;
-    const targetDate = date ? new Date(date) : new Date();
+    const now = new Date();
+    // Get current time in Sri Lanka (+05:30)
+    const slNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const slNowStr = slNow.toISOString().substring(0, 10);
+
+    // Determine the requested date string
+    const targetDateStr = date ? date.substring(0, 10) : slNowStr;
+
+    // Use a virtual "currentTime" for comparison based on the date
+    let currentTime;
+    if (targetDateStr < slNowStr) {
+      // Past date: all trips should show as completed
+      currentTime = 24 * 60 + 1;
+    } else if (targetDateStr > slNowStr) {
+      // Future date: all trips should show as upcoming
+      currentTime = -1;
+    } else {
+      // Today: use actual current local time
+      currentTime = slNow.getUTCHours() * 60 + slNow.getUTCMinutes();
+    }
 
     const query = bus_id ? { bus_id } : {};
 
@@ -111,8 +131,6 @@ const getScheduledTrips = async (req, res) => {
     }
 
     const scheduledTrips = [];
-    const now = new Date();
-    const currentTime = now.getHours() * 60 + now.getMinutes();
 
     schedules.forEach(schedule => {
       if (schedule.trips && Array.isArray(schedule.trips)) {

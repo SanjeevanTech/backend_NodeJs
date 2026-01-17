@@ -34,16 +34,16 @@ const busRouteSchema = new mongoose.Schema({
     required: true
   },
   description: String,
-  
+
   // NEW: Reference to waypoint groups (preferred method)
   waypoint_groups: [{
     group_id: String,
     order: Number  // Order in which groups are combined
   }],
-  
+
   // OLD: Direct stops (for backward compatibility)
   stops: [stopSchema],
-  
+
   total_distance_km: {
     type: Number,
     default: 0
@@ -52,17 +52,17 @@ const busRouteSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  
+
   // Which buses use this route
   assigned_buses: [{
     type: String  // bus_id like "BUS_JC_001"
   }],
-  
+
   is_active: {
     type: Boolean,
     default: true
   },
-  
+
   created_at: {
     type: Date,
     default: Date.now
@@ -78,4 +78,4 @@ const busRouteSchema = new mongoose.Schema({
 busRouteSchema.index({ is_active: 1 });
 busRouteSchema.index({ 'stops.latitude': 1, 'stops.longitude': 1 });
 
-module.exports = mongoose.model('BusRoute', busRouteSchema);
+module.exports = mongoose.models.BusRoute || mongoose.model('BusRoute', busRouteSchema);

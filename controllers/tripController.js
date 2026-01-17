@@ -145,8 +145,10 @@ const getTrips = async (req, res) => {
             const boardingTimeLocal = showLocal(entryTime);
             const endTimeLocal = showLocal(exitTime);
 
+            const actualTripId = tripData._id; // The grouped trip_id from the database
+
             allTrips.push({
-              trip_id: scheduledTripId,
+              trip_id: actualTripId,
               trip_name: tripData.route_name ? `${tripData.route_name} - ${boardingTimeLocal}` : `Trip ${i + 1} - ${boardingTimeLocal}`,
               bus_id: busId,
               route: tripData.route_name || 'Unknown Route',

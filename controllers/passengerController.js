@@ -49,22 +49,27 @@ const getPassengers = async (req, res) => {
           if (scheduleHistory && scheduleHistory.trips && scheduleHistory.trips[tripIndex]) {
             // Use the saved schedule history
             console.log(`   ✅ Using saved schedule history for ${dateFromTrip}`);
-            const scheduledTrip = scheduleHistory.trips[tripIndex];
-            const departureTime = scheduledTrip.departure_time || scheduledTrip.boarding_start_time;
-            const arrivalTime = scheduledTrip.estimated_arrival_time;
+            const currentTrip = scheduleHistory.trips[tripIndex];
+            const departureTime = currentTrip.departure_time || currentTrip.boarding_start_time || '00:00';
 
-            console.log(`   Trip: ${scheduledTrip.trip_name}`);
-            console.log(`   Departure: ${departureTime}, Arrival: ${arrivalTime}`);
+            const tripStartTime = new Date(`${dateFromTrip}T${departureTime}:00.000+05:30`);
 
-            // Create time window using the historical schedule
-            const tripDateTimeStr = `${dateFromTrip}T${departureTime}:00.000+05:30`;
-            const tripDateTime = new Date(tripDateTimeStr);
+            // Sequential Block: Start 15m before, end 15m before next trip
+            let startMs = tripStartTime.getTime() - (15 * 60 * 1000);
+            let endMs = tripStartTime.getTime() + (4 * 60 * 60 * 1000);
 
-            // Create window ±3 hours around the scheduled time
-            const startWindow = new Date(tripDateTime.getTime() - 3 * 60 * 60 * 1000);
-            const endWindow = new Date(tripDateTime.getTime() + 3 * 60 * 60 * 1000);
+            if (scheduleHistory.trips[tripIndex + 1]) {
+              const nextTime = scheduleHistory.trips[tripIndex + 1].departure_time || scheduleHistory.trips[tripIndex + 1].boarding_start_time;
+              if (nextTime) {
+                const nextStartTime = new Date(`${dateFromTrip}T${nextTime}:00.000+05:30`);
+                endMs = nextStartTime.getTime() - (15 * 60 * 1000);
+              }
+            }
 
-            console.log(`   Time window (±3 hours): ${startWindow.toISOString()} to ${endWindow.toISOString()}`);
+            const startWindow = new Date(startMs);
+            const endWindow = new Date(endMs);
+
+            console.log(`   Historical Block | Trip: ${currentTrip.trip_name || tripIndex} | Window: ${startWindow.toLocaleTimeString()} - ${endWindow.toLocaleTimeString()}`);
 
             query.bus_id = busIdFromTrip;
             query.entry_timestamp = {
@@ -140,23 +145,26 @@ const getPassengers = async (req, res) => {
           }
 
           if (schedule && schedule.trips && schedule.trips[tripIndex]) {
-            const scheduledTrip = schedule.trips[tripIndex];
-            const departureTime = scheduledTrip.departure_time || scheduledTrip.boarding_start_time;
+            const currentTrip = schedule.trips[tripIndex];
+            const departureTime = currentTrip.departure_time || currentTrip.boarding_start_time || '00:00';
+            const tripStartTime = new Date(`${dateFromTrip}T${departureTime}:00.000+05:30`);
 
-            console.log(`🎯 Filtering for scheduled trip ID: ${trip_id}`);
-            console.log(`   Found Trip Name: ${scheduledTrip.trip_name}`);
-            console.log(`   Departure time (Sched): ${departureTime}`);
-            console.log(`   Date (Sched): ${dateFromTrip}`);
+            // Sequential Block: Start 15m before, end 15m before next trip
+            let startMs = tripStartTime.getTime() - (15 * 60 * 1000);
+            let endMs = tripStartTime.getTime() + (4 * 60 * 60 * 1000);
 
-            // FIX: Treat departure time as Local Time (+05:30 for Sri Lanka) to get correct UTC window
-            const tripDateTimeStr = `${dateFromTrip}T${departureTime}:00.000+05:30`;
-            const tripDateTime = new Date(tripDateTimeStr);
+            if (schedule.trips[tripIndex + 1]) {
+              const nextTime = schedule.trips[tripIndex + 1].departure_time || schedule.trips[tripIndex + 1].boarding_start_time;
+              if (nextTime) {
+                const nextStartTime = new Date(`${dateFromTrip}T${nextTime}:00.000+05:30`);
+                endMs = nextStartTime.getTime() - (15 * 60 * 1000);
+              }
+            }
 
-            // Create window ±3 hours around the scheduled time
-            const startWindow = new Date(tripDateTime.getTime() - 3 * 60 * 60 * 1000);
-            const endWindow = new Date(tripDateTime.getTime() + 3 * 60 * 60 * 1000);
+            const startWindow = new Date(startMs);
+            const endWindow = new Date(endMs);
 
-            console.log(`   Time window (±3 hours): ${startWindow.toISOString()} to ${endWindow.toISOString()}`);
+            console.log(`🎯 Passenger Sync | Trip ${tripIndex} | Window: ${startWindow.toLocaleTimeString()} - ${endWindow.toLocaleTimeString()}`);
 
             query.bus_id = busIdFromTrip;
             query.entry_timestamp = {

@@ -17,45 +17,62 @@ const getUnmatched = async (req, res) => {
 
     let query = {};
 
-    // Handle scheduled trip filtering
+    // Handle trip filtering
     if (trip_id && trip_id !== 'ALL') {
-      if (trip_id.startsWith('SCHEDULED_')) {
+      let isVirtualTrip = trip_id.startsWith('SCHEDULED_');
+      let tripIndex = -1;
+      let dateFromTrip = date ? date.substring(0, 10) : '';
+      let busIdFromTrip = bus_id;
+
+      if (isVirtualTrip) {
         const parts = trip_id.split('_');
-        const tripIndex = parseInt(parts[parts.length - 1]);
-        const busIdFromTrip = parts.slice(1, -2).join('_');
-        const dateFromTrip = parts[parts.length - 2];
+        tripIndex = parseInt(parts[parts.length - 1]);
+        dateFromTrip = parts[parts.length - 2];
+        busIdFromTrip = parts.slice(1, -2).join('_');
+      }
 
-        let schedule = await BusSchedule.findOne({ bus_id: busIdFromTrip });
+      // ALWAYS try to use the time window if we can find a schedule
+      // This solves the Jan 16 issue where all records have the SAME trip_id
+      let schedule = await BusSchedule.findOne({ bus_id: busIdFromTrip });
+      if (!schedule) {
+        const ScheduleHistory = require('../models/ScheduleHistory');
+        const history = await ScheduleHistory.findOne({ bus_id: busIdFromTrip, date: dateFromTrip });
+        if (history && history.trips) schedule = history;
+      }
 
-        // FALLBACK: If no record in BusSchedule, check powerConfigs
-        if (!schedule) {
-          console.log(`   ⚠️ No schedule in bus_schedules for ${busIdFromTrip}, checking powerConfigs fallback`);
-          const mongoose = require('mongoose');
-          const PowerConfig = mongoose.models.PowerConfig || mongoose.model('PowerConfig', new mongoose.Schema({}, { strict: false }), 'powerConfigs');
-          schedule = await PowerConfig.findOne({ bus_id: busIdFromTrip });
+      // If we have a schedule and a trip index
+      if (schedule && schedule.trips) {
+        // If it wasn't a virtual ID, try to find which index this real trip_id might correspond to based on time
+        if (tripIndex === -1 && trip_id.includes('_')) {
+          // This is a bit of a heuristic for real IDs that contain a time
+          const timePart = trip_id.split('_').pop();
+          tripIndex = schedule.trips.findIndex(t => t.departure_time === timePart || t.boarding_start_time === timePart);
         }
 
-        if (schedule && schedule.trips && schedule.trips[tripIndex]) {
-          const scheduledTrip = schedule.trips[tripIndex];
-          const departureTime = scheduledTrip.departure_time || scheduledTrip.boarding_start_time;
-          const [depHour, depMin] = departureTime.split(':').map(Number);
+        if (tripIndex !== -1 && schedule.trips[tripIndex]) {
+          const currentTrip = schedule.trips[tripIndex];
+          const departureTime = currentTrip.departure_time || currentTrip.boarding_start_time || '00:00';
+          const tripStartTime = new Date(`${dateFromTrip}T${departureTime}:00.000+05:30`);
 
-          console.log(`🎯 Filtering unmatched for scheduled trip: ${trip_id}`);
-          console.log(`   Departure time: ${departureTime}`);
-          console.log(`   Date: ${dateFromTrip}`);
+          // Window starts 15 mins before this trip
+          let startMs = tripStartTime.getTime() - (15 * 60 * 1000);
 
-          // Create time window: ±30 minutes around departure time (more precise filtering)
-          const departureDate = new Date(`${dateFromTrip}T${departureTime}:00`);
-          const startWindow = new Date(departureDate.getTime() - 30 * 60 * 1000); // 30 min before
-          const endWindow = new Date(departureDate.getTime() + 30 * 60 * 1000);   // 30 min after
+          // Window ends exactly when the next trip's window starts (Departure_Next - 15m)
+          let endMs = tripStartTime.getTime() + (4 * 60 * 60 * 1000); // Default
 
-          console.log(`   Time window: ${startWindow.toISOString()} to ${endWindow.toISOString()}`);
+          if (schedule.trips[tripIndex + 1]) {
+            const nextTime = schedule.trips[tripIndex + 1].departure_time || schedule.trips[tripIndex + 1].boarding_start_time;
+            if (nextTime) {
+              const nextStartTime = new Date(`${dateFromTrip}T${nextTime}:00.000+05:30`);
+              endMs = nextStartTime.getTime() - (15 * 60 * 1000);
+            }
+          }
 
           query.bus_id = busIdFromTrip;
-          query.timestamp = {
-            $gte: startWindow,
-            $lte: endWindow
-          };
+          query.timestamp = { $gte: new Date(startMs), $lte: new Date(endMs) };
+          console.log(`🎯 Filtered Trip Slot ${tripIndex} for ${dateFromTrip} | Window (UTC): ${new Date(startMs).toISOString()} to ${new Date(endMs).toISOString()}`);
+        } else {
+          query.trip_id = trip_id;
         }
       } else {
         query.trip_id = trip_id;
@@ -63,7 +80,7 @@ const getUnmatched = async (req, res) => {
     }
 
     // Filter by date
-    if (date && !query.timestamp) {
+    if (date && !query.timestamp && !query.trip_id) {
       const dateStr = date.substring(0, 10);
       query.timestamp = {
         $gte: new Date(dateStr + 'T00:00:00.000Z'),

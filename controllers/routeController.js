@@ -4,14 +4,7 @@ const BusSchedule = require('../models/BusSchedule'); // Added
 const ScheduleHistory = require('../models/ScheduleHistory'); // Added
 const axios = require('axios');
 
-// Helper to get flexible model
-const getModel = (modelName, collectionName) => {
-  try {
-    return mongoose.model(modelName);
-  } catch (error) {
-    return mongoose.model(modelName, new mongoose.Schema({}, { strict: false }), collectionName);
-  }
-};
+const Route = require('../models/BusRoute');
 
 // @desc    Calculate route distance using OSRM
 // @route   GET /api/route-distance
@@ -70,24 +63,36 @@ const calculateRouteDistance = async (req, res) => {
         }
 
         if (scheduledTrip) {
-          const departureTime = scheduledTrip.departure_time || scheduledTrip.boarding_start_time;
+          const departureTime = scheduledTrip.departure_time || scheduledTrip.boarding_start_time || '00:00';
+          const tripStartTime = new Date(`${dateFromTrip}T${departureTime}:00.000+05:30`);
 
-          // Construct time window
-          const tripDateTimeStr = `${dateFromTrip}T${departureTime}:00.000+05:30`;
-          const tripDateTime = new Date(tripDateTimeStr);
+          let startMs = tripStartTime.getTime() - (15 * 60 * 1000);
+          let endMs = tripStartTime.getTime() + (4 * 60 * 60 * 1000);
 
-          const startWindow = new Date(tripDateTime.getTime() - 3 * 60 * 60 * 1000); // -3 hours
-          const endWindow = new Date(tripDateTime.getTime() + 3 * 60 * 60 * 1000);   // +3 hours
+          // Fetch full schedule to find next trip
+          let activeSchedule = null;
+          try {
+            const BusSchedule = require('../models/BusSchedule');
+            activeSchedule = await BusSchedule.findOne({ bus_id: busIdFromTrip });
+            if (!activeSchedule) {
+              const ScheduleHistory = require('../models/ScheduleHistory');
+              activeSchedule = await ScheduleHistory.findOne({ bus_id: busIdFromTrip, date: dateFromTrip });
+            }
+          } catch (e) { }
 
-          // Override default day query with specific window
-          query.entry_timestamp = {
-            $gte: startWindow,
-            $lte: endWindow
-          };
+          if (activeSchedule && activeSchedule.trips && activeSchedule.trips[tripIndex + 1]) {
+            const nextTime = activeSchedule.trips[tripIndex + 1].departure_time || activeSchedule.trips[tripIndex + 1].boarding_start_time;
+            if (nextTime) {
+              const nextStartTime = new Date(`${dateFromTrip}T${nextTime}:00.000+05:30`);
+              endMs = nextStartTime.getTime() - (15 * 60 * 1000);
+            }
+          }
 
-          // Ensure bus_id matches the trip's bus
+          const startWindow = new Date(startMs);
+          const endWindow = new Date(endMs);
+
+          query.entry_timestamp = { $gte: startWindow, $lte: endWindow };
           if (!query.bus_id) query.bus_id = busIdFromTrip;
-
         } else {
           console.log("Could not find scheduled trip details for distance calc");
           // If trip not found, maybe fall back to ID filtering? 
@@ -183,7 +188,6 @@ const calculateRouteDistance = async (req, res) => {
 // @access  Private
 const createRoute = async (req, res) => {
   try {
-    const Route = getModel('Route', 'routes');
     const route = new Route(req.body);
     await route.save();
     res.status(201).json({ success: true, route });
@@ -198,7 +202,6 @@ const createRoute = async (req, res) => {
 // @access  Private
 const updateRoute = async (req, res) => {
   try {
-    const Route = getModel('Route', 'routes');
     const route = await Route.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -221,7 +224,6 @@ const updateRoute = async (req, res) => {
 // @access  Private
 const deleteRoute = async (req, res) => {
   try {
-    const Route = getModel('Route', 'routes');
     const route = await Route.findByIdAndDelete(req.params.id);
 
     if (!route) {

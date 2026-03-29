@@ -18,6 +18,12 @@ const seasonTicketMemberSchema = new mongoose.Schema({
     type: [Number],
     required: true
   },
+  // Multi-lighting embeddings (up to 5 captures under different lighting)
+  // Server compares ALL stored embeddings and accepts if ANY one matches.
+  face_embeddings: {
+    type: [[Number]],
+    default: []
+  },
   embedding_size: Number,
   face_photo_url: String, // Optional: store photo reference
   

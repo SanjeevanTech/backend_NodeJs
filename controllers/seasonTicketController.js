@@ -76,6 +76,7 @@ const createMember = async (req, res) => {
       phone,
       email,
       face_embedding,
+      face_embeddings,
       embedding_size,
       ticket_type,
       valid_routes,
@@ -85,31 +86,39 @@ const createMember = async (req, res) => {
       to_location
     } = req.body;
 
-    if (!name || !face_embedding || !valid_from || !valid_until) {
+    if (!name || (!face_embedding && !face_embeddings) || !valid_from || !valid_until) {
       return res.status(400).json({
         status: 'error',
-        message: 'Missing required fields: name, face_embedding, valid_from, valid_until'
+        message: 'Missing required fields: name, face_embedding (or face_embeddings), valid_from, valid_until'
       });
     }
+
+    // Resolve primary embedding and build multi-lighting set (max 5)
+    const primaryEmbedding = face_embedding || (face_embeddings && face_embeddings[0]) || [];
+    let allEmbeddings = face_embeddings && Array.isArray(face_embeddings)
+      ? face_embeddings
+      : [primaryEmbedding];
+    if (allEmbeddings.length > 5) allEmbeddings = allEmbeddings.slice(-5);
 
     // Auto-generate member_id
     const count = await SeasonTicketMember.countDocuments();
     const member_id = `ST${new Date().getFullYear()}${String(count + 1).padStart(4, '0')}`;
 
-    console.log(`✅ Auto-generated Member ID: ${member_id}`);
+    console.log(`✅ Auto-generated Member ID: ${member_id} | Embeddings: ${allEmbeddings.length}`);
 
     const member = new SeasonTicketMember({
       member_id,
       name,
       phone,
       email,
-      face_embedding,
-      embedding_size: embedding_size || face_embedding.length,
+      face_embedding: primaryEmbedding,       // backward compat
+      face_embeddings: allEmbeddings,         // multi-lighting set
+      embedding_size: embedding_size || primaryEmbedding.length,
       ticket_type: ticket_type || 'monthly',
       valid_routes: valid_routes || [],
       valid_from: new Date(valid_from),
       valid_until: new Date(valid_until),
-      needs_hardware_sync: true, // Flag for ESP32 model sync
+      needs_hardware_sync: true,
       is_active: true
     });
 
@@ -117,7 +126,8 @@ const createMember = async (req, res) => {
 
     res.json({
       status: 'success',
-      message: 'Season ticket member created successfully',
+      message: `Season ticket member created. Embeddings stored: ${allEmbeddings.length}/5`,
+      embeddings_count: allEmbeddings.length,
       member: member
     });
   } catch (error) {

@@ -15,6 +15,13 @@ const contractorSchema = new mongoose.Schema({
         type: [Number],
         required: true
     },
+    // Multi-lighting embeddings (up to 5 captures under different lighting)
+    // Server compares ALL stored embeddings and accepts if ANY one matches.
+    // Backward compatible: old single face_embedding still works.
+    face_embeddings: {
+        type: [[Number]],
+        default: []
+    },
     embedding_size: {
         type: Number,
         required: true

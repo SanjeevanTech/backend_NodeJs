@@ -145,7 +145,7 @@ const getTrips = async (req, res) => {
             const boardingTimeLocal = showLocal(entryTime);
             const endTimeLocal = showLocal(exitTime);
 
-            const actualTripId = tripData._id; // The grouped trip_id from the database
+            const actualTripId = `SCHEDULED_${busId}_${dateStr}_${i}`; // Ensure this acts correctly as a string
 
             allTrips.push({
               trip_id: actualTripId,

@@ -54,11 +54,18 @@ const getPassengers = async (req, res) => {
 
             const tripStartTime = new Date(`${dateFromTrip}T${departureTime}:00.000+05:30`);
 
-            // Sequential Block: Start 15m before, end 15m before next trip
+            // Sequential Block: Start 15m before, end properly
             let startMs = tripStartTime.getTime() - (15 * 60 * 1000);
             let endMs = tripStartTime.getTime() + (4 * 60 * 60 * 1000);
 
-            if (scheduleHistory.trips[tripIndex + 1]) {
+            const tripEndTimeStr = currentTrip.estimated_arrival_time || currentTrip.end_time;
+            if (tripEndTimeStr) {
+              const tripEndTime = new Date(`${dateFromTrip}T${tripEndTimeStr}:00.000+05:30`);
+              if (tripEndTime < tripStartTime) {
+                tripEndTime.setDate(tripEndTime.getDate() + 1);
+              }
+              endMs = tripEndTime.getTime() + (60 * 60 * 1000); // 1 hour buffer after arrival
+            } else if (scheduleHistory.trips[tripIndex + 1]) {
               const nextTime = scheduleHistory.trips[tripIndex + 1].departure_time || scheduleHistory.trips[tripIndex + 1].boarding_start_time;
               if (nextTime) {
                 const nextStartTime = new Date(`${dateFromTrip}T${nextTime}:00.000+05:30`);
@@ -149,11 +156,18 @@ const getPassengers = async (req, res) => {
             const departureTime = currentTrip.departure_time || currentTrip.boarding_start_time || '00:00';
             const tripStartTime = new Date(`${dateFromTrip}T${departureTime}:00.000+05:30`);
 
-            // Sequential Block: Start 15m before, end 15m before next trip
+            // Sequential Block: Start 15m before, end properly
             let startMs = tripStartTime.getTime() - (15 * 60 * 1000);
             let endMs = tripStartTime.getTime() + (4 * 60 * 60 * 1000);
 
-            if (schedule.trips[tripIndex + 1]) {
+            const tripEndTimeStr = currentTrip.estimated_arrival_time || currentTrip.end_time;
+            if (tripEndTimeStr) {
+              const tripEndTime = new Date(`${dateFromTrip}T${tripEndTimeStr}:00.000+05:30`);
+              if (tripEndTime < tripStartTime) {
+                tripEndTime.setDate(tripEndTime.getDate() + 1);
+              }
+              endMs = tripEndTime.getTime() + (60 * 60 * 1000); // 1 hour buffer after arrival
+            } else if (schedule.trips[tripIndex + 1]) {
               const nextTime = schedule.trips[tripIndex + 1].departure_time || schedule.trips[tripIndex + 1].boarding_start_time;
               if (nextTime) {
                 const nextStartTime = new Date(`${dateFromTrip}T${nextTime}:00.000+05:30`);

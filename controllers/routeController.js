@@ -69,7 +69,6 @@ const calculateRouteDistance = async (req, res) => {
           let startMs = tripStartTime.getTime() - (15 * 60 * 1000);
           let endMs = tripStartTime.getTime() + (4 * 60 * 60 * 1000);
 
-          // Fetch full schedule to find next trip
           let activeSchedule = null;
           try {
             const BusSchedule = require('../models/BusSchedule');
@@ -80,7 +79,14 @@ const calculateRouteDistance = async (req, res) => {
             }
           } catch (e) { }
 
-          if (activeSchedule && activeSchedule.trips && activeSchedule.trips[tripIndex + 1]) {
+          const tripEndTimeStr = scheduledTrip.estimated_arrival_time || scheduledTrip.end_time;
+          if (tripEndTimeStr) {
+            const tripEndTime = new Date(`${dateFromTrip}T${tripEndTimeStr}:00.000+05:30`);
+            if (tripEndTime < tripStartTime) {
+              tripEndTime.setDate(tripEndTime.getDate() + 1);
+            }
+            endMs = tripEndTime.getTime() + (60 * 60 * 1000); // 1 hour buffer after arrival
+          } else if (activeSchedule && activeSchedule.trips && activeSchedule.trips[tripIndex + 1]) {
             const nextTime = activeSchedule.trips[tripIndex + 1].departure_time || activeSchedule.trips[tripIndex + 1].boarding_start_time;
             if (nextTime) {
               const nextStartTime = new Date(`${dateFromTrip}T${nextTime}:00.000+05:30`);
